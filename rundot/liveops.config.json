@@ -1,0 +1,55 @@
+{
+  "client": {
+    "values": {
+      "monetization": {
+        "enabled": true,
+        "privateTestMode": false,
+        "purchasesEnabled": true,
+        "rewardedAdsEnabled": true,
+        "interstitialAdsEnabled": true,
+        "placements": {
+          "rewarded_second_wind": {
+            "enabled": true,
+            "cooldownSeconds": 120,
+            "sessionCap": 3,
+            "dailyCap": 3,
+            "rewardMultiplier": 1
+          },
+          "interstitial_results_break": {
+            "enabled": true,
+            "cooldownSeconds": 600,
+            "sessionCap": 1,
+            "dailyCap": 3,
+            "everyNthRun": 3
+          }
+        },
+        "products": {
+          "no_interstitials": {
+            "enabled": true
+          },
+          "ledger_pack": {
+            "enabled": true
+          },
+          "founder_bundle": {
+            "enabled": true
+          },
+          "ink_case_small": {
+            "enabled": true
+          },
+          "ink_case_medium": {
+            "enabled": true
+          },
+          "ink_case_large": {
+            "enabled": true
+          }
+        }
+      }
+    },
+    "overrides": [],
+    "experiments": []
+  },
+  "server": {
+    "values": {},
+    "overrides": []
+  }
+}

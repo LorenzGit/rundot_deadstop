@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        <meta name="theme-color" content="#f4eee1" />
+        <meta name="color-scheme" content="light" />
+        <link rel="icon" href="./thumbnail.jpg" type="image/jpeg" />
+        <title>DEADSTOP</title>
+        <style>
+            html,
+            body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                overflow: hidden;
+                background: #f4eee1;
+            }
+            #boot-cover {
+                position: fixed;
+                inset: 0;
+                z-index: 999;
+                display: grid;
+                place-items: center;
+                color: #14100c;
+                background: #f4eee1;
+                transition: opacity 260ms ease;
+            }
+            #boot-cover.hidden {
+                opacity: 0;
+                pointer-events: none;
+            }
+            .boot-panel {
+                width: min(84vw, 560px);
+                text-align: center;
+                font:
+                    900 clamp(34px, 11vw, 92px) / 0.9 Impact,
+                    Haettenschweiler,
+                    "Arial Narrow Bold",
+                    system-ui,
+                    sans-serif;
+                letter-spacing: 0.02em;
+            }
+            .boot-stage {
+                position: relative;
+                width: min(300px, 62vw);
+                height: clamp(70px, 16vh, 110px);
+                margin: 0 auto 10px;
+            }
+            .boot-figure,
+            .boot-round {
+                position: absolute;
+                background: #14100c;
+            }
+            .boot-figure {
+                bottom: 6px;
+                left: 18%;
+                width: 4px;
+                height: 34px;
+                border-radius: 2px;
+                box-shadow:
+                    -9px -4px 0 -1px #14100c,
+                    9px -4px 0 -1px #14100c,
+                    -8px 22px 0 -1px #14100c,
+                    8px 22px 0 -1px #14100c;
+                animation: boot-lean 1.6s ease-in-out infinite;
+            }
+            .boot-figure::before {
+                content: "";
+                position: absolute;
+                top: -16px;
+                left: -5px;
+                width: 14px;
+                height: 14px;
+                border: 4px solid #14100c;
+                border-radius: 50%;
+                box-sizing: border-box;
+            }
+            .boot-round {
+                top: 42%;
+                right: 12%;
+                width: 10px;
+                height: 4px;
+                border-radius: 2px;
+                background: #c8382a;
+                animation: boot-round 1.6s ease-in-out infinite;
+            }
+            .boot-round.second {
+                top: 62%;
+                right: 30%;
+                animation-delay: 0.35s;
+            }
+            @keyframes boot-lean {
+                0%,
+                100% {
+                    transform: rotate(-3deg);
+                }
+                50% {
+                    transform: rotate(3deg);
+                }
+            }
+            @keyframes boot-round {
+                0%,
+                100% {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+                50% {
+                    transform: translateX(-18px);
+                    opacity: 0.55;
+                }
+            }
+            .boot-track {
+                width: min(300px, 62vw);
+                height: 6px;
+                margin: 16px auto 10px;
+                background: #e0d6c2;
+                border-radius: 3px;
+                overflow: hidden;
+            }
+            #boot-fill {
+                width: 6%;
+                height: 100%;
+                background: #14100c;
+                transition: width 220ms ease;
+            }
+            .boot-copy {
+                margin: 0;
+                font:
+                    700 clamp(11px, 2.6vw, 14px) / 1.3 Impact,
+                    Haettenschweiler,
+                    "Arial Narrow Bold",
+                    system-ui,
+                    sans-serif;
+                letter-spacing: 0.22em;
+                color: #7d7263;
+            }
+            @media (prefers-reduced-motion: reduce) {
+                .boot-figure,
+                .boot-round {
+                    animation: none;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div id="boot-cover" role="status" aria-live="polite">
+            <div class="boot-panel">
+                <div class="boot-stage" aria-hidden="true">
+                    <span class="boot-figure"></span>
+                    <span class="boot-round"></span>
+                    <span class="boot-round second"></span>
+                </div>
+                DEADSTOP
+                <div class="boot-track" aria-hidden="true"><div id="boot-fill"></div></div>
+                <p id="boot-copy" class="boot-copy">INKING THE PAGE</p>
+            </div>
+        </div>
+
+        <main id="app" aria-label="DEADSTOP game">
+            <div id="app-frame">
+                <div id="scene-host" aria-hidden="true"></div>
+
+                <div id="touch-controls" class="touch-controls hidden" aria-hidden="true">
+                    <div id="aim-zone" class="touch-zone aim-zone"></div>
+                    <div id="move-zone" class="touch-zone move-zone">
+                        <div id="stick-base" class="stick-base"><span id="stick-knob" class="stick-knob"></span></div>
+                    </div>
+                    <button id="fire-button" class="ink-button fire-button" type="button" aria-label="Fire">
+                        FIRE
+                    </button>
+                    <!--
+                        MOVE and THROW are visible objects; shooting is the whole
+                        page, which no one expects. It gets a standing label too.
+                    -->
+                    <span id="tap-to-shoot" class="tap-to-shoot">TAP THE PAGE TO SHOOT</span>
+                </div>
+
+                <button
+                    id="performance-hud"
+                    class="performance-hud hidden"
+                    type="button"
+                    aria-label="Hide performance counter"
+                >
+                    <strong id="performance-fps">-- FPS</strong>
+                    <span id="performance-frame">-- MS · -- P95</span>
+                    <small id="performance-detail">RENDERER · SIM -- · DRAW --</small>
+                    <small id="performance-renderer-reason">CHECKING GPU PATH</small>
+                </button>
+
+                <div id="rotate-hint" class="rotate-hint" role="status">
+                    <span class="rotate-mark" aria-hidden="true"></span>
+                    <strong>TURN THE PAGE SIDEWAYS</strong>
+                    <small>DEADSTOP IS DRAWN IN LANDSCAPE</small>
+                </div>
+
+                <section id="hud" class="hud hidden" aria-label="Run status">
+                    <div class="hud-score-slot">
+                        <strong id="score-text">0</strong>
+                        <span id="chain-text" class="chain hidden">CHAIN x1.00</span>
+                    </div>
+
+                    <div class="hud-level-slot">
+                        <strong id="level-text">LEVEL 1</strong>
+                        <span id="level-plan">OPEN FLOOR</span>
+                        <span id="level-note">CLEAR › SMG</span>
+                        <span id="level-remaining">3 LEFT</span>
+                    </div>
+
+                    <div id="booster-strip" class="booster-strip" aria-label="Boosters in play"></div>
+
+                    <div class="hud-weapon-slot">
+                        <span class="weapon-mark" aria-hidden="true"></span>
+                        <strong id="weapon-text">PISTOL</strong>
+                        <div id="ammo-pips" class="ammo-pips" aria-label="Rounds remaining"></div>
+                    </div>
+
+                    <div class="hud-time-slot">
+                        <span>TIME</span>
+                        <div class="time-track"><div id="time-fill"></div></div>
+                    </div>
+
+                    <button id="pause-button" class="ink-icon-button pause-button" type="button" aria-label="Pause">
+                        <span aria-hidden="true"></span>
+                    </button>
+                </section>
+
+
+                <div id="tap-tutorial" class="tap-tutorial" role="status">
+                    <strong id="tap-tutorial-copy">MOVE TO MOVE TIME</strong>
+                    <small id="tap-tutorial-hint">WASD MOVE · MOUSE AIM · CLICK FIRE · F THROWS THE GUN</small>
+                </div>
+
+                <!--
+                    Touch play shows a MOVE stick and a THROW button. Desktop had
+                    nothing in those corners, so the same two answers are printed
+                    in the same two places.
+                -->
+                <div id="key-legend" class="key-legend" aria-hidden="true">
+                    <div class="key-legend-slot key-legend-move">
+                        <span class="key-caps"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>
+                        <small>MOVE</small>
+                    </div>
+                </div>
+
+                <div id="milestone" class="milestone" role="status">
+                    <span id="milestone-kicker">WAVE 1</span>
+                    <strong id="milestone-title">CLEARED</strong>
+                </div>
+
+                <div id="toast" class="toast" role="status"></div>
+                <div id="flow-wipe" class="flow-wipe" aria-hidden="true"></div>
+
+                <!-- ------------------------------------------------------ menu -->
+                <section id="menu-screen" class="screen menu-screen active" aria-label="Main menu">
+                    <div class="menu-mark" aria-hidden="true"></div>
+                    <h1 class="game-title">DEADSTOP</h1>
+                    <p class="game-tagline">TIME ONLY BREATHES WHEN YOU DO</p>
+
+                    <button id="play-button" class="ink-button primary-button" type="button">START THE PAGE</button>
+
+                    <div class="record-strip">
+                        <div><span>BEST</span><strong id="best-score">0</strong></div>
+                        <div><span>DEEPEST</span><strong id="best-level">1</strong></div>
+                        <div><span>DOWNS</span><strong id="lifetime-downs">0</strong></div>
+                        <div><span>INK</span><strong id="wallet-ink">0</strong></div>
+                    </div>
+
+                    <nav class="menu-nav">
+                        <button id="kit-button" class="ink-button" type="button">
+                            KIT<span id="kit-badge" class="badge hidden">0</span>
+                        </button>
+                        <button id="ledger-button" class="ink-button" type="button">LEDGER</button>
+                        <button id="daily-button" class="ink-button" type="button">
+                            DAILY<span id="daily-badge" class="badge hidden">!</span>
+                        </button>
+                        <button id="settings-button" class="ink-button" type="button">SETTINGS</button>
+                    </nav>
+
+                    <footer class="menu-footer">
+                        <button id="version-label" class="version-label" type="button">v0.0.0</button>
+                        <span id="save-badge" class="save-badge">LOCAL SAVE</span>
+                    </footer>
+                </section>
+
+                <!-- ---------------------------------------------------- ledger -->
+                <section id="ledger-screen" class="screen sheet-screen" aria-label="Ledger">
+                    <div class="sheet">
+                    <header class="sheet-header">
+                        <h2>THE LEDGER</h2>
+                        <span class="wallet-chip">INK <strong id="ledger-wallet">0</strong></span>
+                    </header>
+                    <p class="sheet-note">
+                        Pages and pens change how the fight is drawn. They never change how it plays.
+                    </p>
+                    <div id="offer-grid" class="offer-grid"></div>
+                    <div id="palette-grid" class="palette-grid"></div>
+                    <button id="ledger-back" class="ink-button sticky-back" type="button">BACK</button>
+                    </div>
+                </section>
+
+                <!-- ----------------------------------------------------- daily -->
+                <section id="daily-screen" class="screen sheet-screen" aria-label="Daily ink">
+                    <div class="sheet">
+                    <header class="sheet-header">
+                        <h2>DAILY INK</h2>
+                        <span class="wallet-chip">INK <strong id="daily-wallet">0</strong></span>
+                    </header>
+                    <div id="daily-grid" class="daily-grid"></div>
+                    <p id="daily-authority" class="sheet-note">CHECKING RUN TIME</p>
+                    <p id="daily-next" class="sheet-note quiet"></p>
+                    <button id="daily-claim" class="ink-button primary-button" type="button">CLAIM TODAY</button>
+                    <button id="daily-back" class="ink-button sticky-back" type="button">BACK</button>
+                    </div>
+                </section>
+
+                <!-- -------------------------------------------------- settings -->
+                <section id="settings-screen" class="screen sheet-screen" aria-label="Settings">
+                    <div class="sheet">
+                    <header class="sheet-header"><h2>SETTINGS</h2></header>
+                    <ul class="settings-list">
+                        <li>
+                            <label for="music-enabled">MUSIC</label>
+                            <input id="music-enabled" type="checkbox" />
+                        </li>
+                        <li>
+                            <label for="music-volume">MUSIC LEVEL</label>
+                            <input id="music-volume" type="range" min="0" max="1" step="0.05" />
+                        </li>
+                        <li>
+                            <label for="sfx-enabled">SOUND</label>
+                            <input id="sfx-enabled" type="checkbox" />
+                        </li>
+                        <li>
+                            <label for="sfx-volume">SOUND LEVEL</label>
+                            <input id="sfx-volume" type="range" min="0" max="1" step="0.05" />
+                        </li>
+                        <li>
+                            <label for="touch-controls-mode">TOUCH CONTROLS</label>
+                            <select id="touch-controls-mode">
+                                <option value="auto">AUTO</option>
+                                <option value="on">ALWAYS ON</option>
+                                <option value="off">OFF</option>
+                            </select>
+                        </li>
+                        <li>
+                            <label for="auto-fire">HOLD TO KEEP FIRING</label>
+                            <input id="auto-fire" type="checkbox" />
+                        </li>
+                        <li>
+                            <label for="haptics-enabled">HAPTICS</label>
+                            <input id="haptics-enabled" type="checkbox" />
+                        </li>
+                        <li>
+                            <label for="replay-tutorial">TUTORIAL</label>
+                            <button id="replay-tutorial" class="ink-button" type="button">SHOW IT AGAIN</button>
+                        </li>
+                        <li>
+                            <label for="daily-reminder">DAILY PAGE REMINDER</label>
+                            <input id="daily-reminder" type="checkbox" />
+                            <small id="daily-reminder-status" class="setting-note">OFF</small>
+                        </li>
+                        <li>
+                            <label for="reduced-motion">REDUCED MOTION</label>
+                            <input id="reduced-motion" type="checkbox" />
+                        </li>
+                        <li>
+                            <label for="fps-counter">FRAME COUNTER</label>
+                            <input id="fps-counter" type="checkbox" />
+                        </li>
+                    </ul>
+                    <article id="settings-noads-offer" class="inline-offer hidden">
+                        <div>
+                            <strong>AD-FREE FOREVER</strong>
+                            <small>Removes the mandatory results break. Optional videos stay.</small>
+                        </div>
+                        <button id="settings-noads-button" class="ink-button" type="button">CHECKING PRICE…</button>
+                    </article>
+                    <button id="settings-back" class="ink-button sticky-back" type="button">BACK</button>
+                    </div>
+                </section>
+
+                <!-- ----------------------------------------------------- pause -->
+                <section id="pause-screen" class="screen sheet-screen" aria-label="Paused">
+                    <div class="sheet">
+                    <header class="sheet-header"><h2>HELD</h2></header>
+                    <p class="sheet-note">The page is holding its breath.</p>
+                    <button id="resume-button" class="ink-button primary-button" type="button">BACK IN</button>
+                    <button id="pause-settings-button" class="ink-button" type="button">SETTINGS</button>
+                    <button id="quit-run-button" class="ink-button danger-button" type="button">END THE RUN</button>
+                    </div>
+                </section>
+
+                <!-- --------------------------------------------------- results -->
+                <section id="results-screen" class="screen sheet-screen" aria-label="Run results">
+                    <div class="sheet">
+                    <header class="sheet-header">
+                        <h2 id="results-title">DOWN</h2>
+                        <span id="results-kicker" class="sheet-kicker">THE PAGE STOPPED</span>
+                    </header>
+
+                    <strong id="results-score" class="results-score">0</strong>
+
+                    <div class="results-grid">
+                        <div><span>LEVEL</span><strong id="results-level">1</strong></div>
+                        <div><span>DOWNS</span><strong id="results-downs">0</strong></div>
+                        <div><span>BEST CHAIN</span><strong id="results-chain">0</strong></div>
+                        <div><span>BOOSTERS</span><strong id="results-boosters">0</strong></div>
+                        <div><span>GRAZES</span><strong id="results-grazes">0</strong></div>
+                        <div><span>INK EARNED</span><strong id="results-ink">0</strong></div>
+                        <div><span>PERSONAL BEST</span><strong id="results-best">0</strong></div>
+                    </div>
+
+                    <article id="second-wind-offer" class="inline-offer hidden">
+                        <div>
+                            <strong>SECOND WIND</strong>
+                            <small id="second-wind-status">CHECKING VIDEO…</small>
+                        </div>
+                        <button id="second-wind-button" class="ink-button" type="button">WATCH · REVIVE</button>
+                    </article>
+
+                    <p id="results-break-note" class="sheet-note quiet"></p>
+
+                    <div class="results-actions">
+                        <button id="retry-button" class="ink-button primary-button" type="button">RUN IT BACK</button>
+                        <button id="menu-button" class="ink-button" type="button">MAIN MENU</button>
+                    </div>
+                    </div>
+                </section>
+
+                <!-- ----------------------------------------------------- draft -->
+                <section id="draft-screen" class="screen sheet-screen" aria-label="Choose a booster">
+                    <div class="sheet">
+                        <header class="sheet-header">
+                            <h2 id="draft-title">PICK ONE</h2>
+                            <span id="draft-kicker" class="sheet-kicker">LEVEL 2 NEXT</span>
+                        </header>
+                        <p class="sheet-note">It stays with you for the rest of the run.</p>
+                        <div id="draft-cards" class="draft-cards"></div>
+                    </div>
+                </section>
+
+                <!-- ------------------------------------------------------- kit -->
+                <section id="kit-screen" class="screen sheet-screen" aria-label="Kit">
+                    <div class="sheet">
+                        <header class="sheet-header">
+                            <h2>THE KIT</h2>
+                            <span class="wallet-chip">INK <strong id="kit-wallet">0</strong></span>
+                        </header>
+                        <p class="sheet-note">
+                            Carry up to two boosters into the next run. Ink is earned by playing; every booster here
+                            is also drafted for free between levels.
+                        </p>
+                        <p id="kit-summary" class="sheet-note quiet">NOTHING PACKED · 0 INK</p>
+                        <div id="kit-grid" class="kit-grid"></div>
+                        <div id="ink-case-grid" class="offer-grid"></div>
+                        <button id="kit-back" class="ink-button sticky-back" type="button">BACK</button>
+                    </div>
+                </section>
+
+                <!-- --------------------------------------- private test bay -->
+                <section id="monetization-test-screen" class="screen sheet-screen" aria-label="Private test bay">
+                    <div class="sheet">
+                    <header class="sheet-header">
+                        <h2>TEST BAY</h2>
+                        <span id="monetization-test-environment" class="sheet-kicker">CHECKING</span>
+                    </header>
+                    <ul class="diagnostics-list">
+                        <li><span>HOST</span><b id="test-host-status">BLOCKED</b></li>
+                        <li><span>LIVEOPS</span><b id="test-liveops-status">BLOCKED</b></li>
+                        <li><span>SHOP</span><b id="test-shop-status">BLOCKED</b></li>
+                        <li><span>ENTITLEMENTS</span><b id="test-entitlements-status">BLOCKED</b></li>
+                        <li><span>ADS</span><b id="test-ads-status">BLOCKED</b></li>
+                        <li><span>REWARDED FILL</span><b id="test-ad-fill-status">BLOCKED</b></li>
+                        <li><span>INTERSTITIAL FILL</span><b id="test-interstitial-fill-status">BLOCKED</b></li>
+                        <li><span>CONFIG</span><b id="test-config-id">—</b></li>
+                        <li><span>CATALOG</span><b id="test-catalog-id">—</b></li>
+                        <li><span>ITEMS</span><b id="test-catalog-count">0</b></li>
+                        <li><span>ENTITLEMENTS HELD</span><b id="test-entitlement-count">0</b></li>
+                    </ul>
+                    <article class="inline-offer">
+                        <div>
+                            <strong id="test-product-name">—</strong>
+                            <small id="test-product-state">—</small>
+                        </div>
+                        <button id="test-purchase-button" class="ink-button" type="button">PURCHASE BLOCKED</button>
+                    </article>
+                    <button id="test-ad-button" class="ink-button" type="button">VIDEO UNAVAILABLE</button>
+                    <button id="test-interstitial-button" class="ink-button" type="button">
+                        INTERSTITIAL UNAVAILABLE
+                    </button>
+                    <p id="monetization-test-log" class="sheet-note quiet">READY</p>
+                    <button id="monetization-test-refresh" class="ink-button" type="button">REFRESH CHECKS</button>
+                    <button id="monetization-test-back" class="ink-button sticky-back" type="button">BACK</button>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <script type="module" src="/src/main.ts"></script>
+    </body>
+</html>

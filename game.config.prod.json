@@ -1,0 +1,14 @@
+{
+  "gameId": null,
+  "relativePathToDistFolder": "dist",
+  "usesPreloader": false,
+  "orientation": "landscape",
+  "keywords": [
+    "shooter",
+    "time",
+    "stick-figure",
+    "arcade",
+    "tactical"
+  ],
+  "kitId": null
+}

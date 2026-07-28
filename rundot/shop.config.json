@@ -1,0 +1,204 @@
+{
+  "items": [
+    {
+      "itemId": "deadstop_ledger_pack",
+      "name": "Ledger Pack",
+      "description": "Permanently unlocks the Blueprint and Carbon pages. Presentation only; it never changes how DEADSTOP plays.",
+      "category": "non_consumable",
+      "price": {
+        "type": "bucks",
+        "value": "199"
+      },
+      "entitlements": [
+        {
+          "entitlementId": "deadstop_ledger_pack",
+          "quantity": 1,
+          "consumable": false
+        }
+      ],
+      "assets": {},
+      "unique": true,
+      "active": true,
+      "regions": [],
+      "refundEligible": true,
+      "refundWindowHours": 24,
+      "tags": [
+        "deadstop",
+        "cosmetic",
+        "permanent"
+      ],
+      "sortOrder": 2,
+      "releasedAt": null,
+      "expiresAt": null
+    },
+    {
+      "itemId": "deadstop_no_interstitials",
+      "name": "Ad-Free Forever",
+      "description": "Permanently removes the mandatory results break. Optional Second Wind videos remain available.",
+      "category": "non_consumable",
+      "price": {
+        "type": "bucks",
+        "value": "299"
+      },
+      "entitlements": [
+        {
+          "entitlementId": "deadstop_no_interstitials",
+          "quantity": 1,
+          "consumable": false
+        }
+      ],
+      "assets": {},
+      "unique": true,
+      "active": true,
+      "regions": [],
+      "refundEligible": true,
+      "refundWindowHours": 24,
+      "tags": [
+        "deadstop",
+        "ad-free",
+        "permanent"
+      ],
+      "sortOrder": 3,
+      "releasedAt": null,
+      "expiresAt": null
+    },
+    {
+      "itemId": "deadstop_founder_bundle",
+      "name": "First Pen Bundle",
+      "description": "Permanently unlocks Ad-Free Forever, the Blueprint and Carbon pages, and the exclusive Red Pen page.",
+      "category": "bundle",
+      "price": {
+        "type": "bucks",
+        "value": "399"
+      },
+      "entitlements": [
+        {
+          "entitlementId": "deadstop_no_interstitials",
+          "quantity": 1,
+          "consumable": false
+        },
+        {
+          "entitlementId": "deadstop_ledger_pack",
+          "quantity": 1,
+          "consumable": false
+        },
+        {
+          "entitlementId": "deadstop_pen_redpen",
+          "quantity": 1,
+          "consumable": false
+        }
+      ],
+      "assets": {},
+      "unique": true,
+      "active": true,
+      "regions": [],
+      "refundEligible": true,
+      "refundWindowHours": 24,
+      "tags": [
+        "deadstop",
+        "founder",
+        "cosmetic",
+        "ad-free",
+        "permanent"
+      ],
+      "sortOrder": 1,
+      "releasedAt": null,
+      "expiresAt": null
+    },
+    {
+      "itemId": "deadstop_ink_case_small",
+      "name": "Small Ink Case",
+      "description": "600 ink for the kit. Every booster is also earnable by playing.",
+      "category": "consumable",
+      "price": {
+        "type": "bucks",
+        "value": "99"
+      },
+      "entitlements": [
+        {
+          "entitlementId": "deadstop_ink_case_small_grant",
+          "quantity": 1,
+          "consumable": true
+        }
+      ],
+      "assets": {},
+      "unique": false,
+      "active": true,
+      "regions": [],
+      "refundEligible": true,
+      "refundWindowHours": 24,
+      "tags": [
+        "deadstop",
+        "ink",
+        "consumable"
+      ],
+      "sortOrder": 4,
+      "releasedAt": null,
+      "expiresAt": null
+    },
+    {
+      "itemId": "deadstop_ink_case_medium",
+      "name": "Ink Case",
+      "description": "2,000 ink for the kit at a better rate.",
+      "category": "consumable",
+      "price": {
+        "type": "bucks",
+        "value": "249"
+      },
+      "entitlements": [
+        {
+          "entitlementId": "deadstop_ink_case_medium_grant",
+          "quantity": 1,
+          "consumable": true
+        }
+      ],
+      "assets": {},
+      "unique": false,
+      "active": true,
+      "regions": [],
+      "refundEligible": true,
+      "refundWindowHours": 24,
+      "tags": [
+        "deadstop",
+        "ink",
+        "consumable"
+      ],
+      "sortOrder": 5,
+      "releasedAt": null,
+      "expiresAt": null
+    },
+    {
+      "itemId": "deadstop_ink_case_large",
+      "name": "Large Ink Case",
+      "description": "5,000 ink for the kit at the best rate.",
+      "category": "consumable",
+      "price": {
+        "type": "bucks",
+        "value": "499"
+      },
+      "entitlements": [
+        {
+          "entitlementId": "deadstop_ink_case_large_grant",
+          "quantity": 1,
+          "consumable": true
+        }
+      ],
+      "assets": {},
+      "unique": false,
+      "active": true,
+      "regions": [],
+      "refundEligible": true,
+      "refundWindowHours": 24,
+      "tags": [
+        "deadstop",
+        "ink",
+        "consumable"
+      ],
+      "sortOrder": 6,
+      "releasedAt": null,
+      "expiresAt": null
+    }
+  ],
+  "sales": [],
+  "collections": []
+}
