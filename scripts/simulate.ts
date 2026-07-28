@@ -27,6 +27,8 @@ import {
     PRESSURE_CADENCE_MAX,
     PRESSURE_FLOOR_LEVEL,
     PRESSURE_SPEED_MAX,
+    PLAYER_RADIUS,
+    WORLD_MARGIN,
     pressureSoakBonus,
     ROSTER_HARD_CAP,
     rewardForLevel,
@@ -759,6 +761,72 @@ const insideBlock =
     settled.y > block.y + 2 &&
     settled.y < block.y + block.height - 2;
 assert.equal(insideBlock, false, "the player must never end up inside a block of cover");
+
+// A figure standing where a block lands must be able to walk out. Testing only
+// the destination point made every direction read as blocked once the body
+// overlapped a block, which froze the player for the rest of the run.
+const trapped = new GameCore();
+trapped.reset(0x00c0_5e01);
+const pen = trapped.snapshot().cover[0];
+assert.ok(pen, "the opening plan must lay out at least one block to sit inside");
+trapped.forcePlayerAt(pen.x + pen.width / 2, pen.y + pen.height / 2);
+const startX = trapped.snapshot().player.x;
+const startY = trapped.snapshot().player.y;
+for (let frame = 0; frame < 240; frame += 1) {
+    trapped.setInput({ moveX: 1, moveY: 0, aimX: WORLD_WIDTH, aimY: startY, firing: false });
+    trapped.update(STEP);
+}
+const freed = trapped.snapshot().player;
+assert.ok(
+    Math.hypot(freed.x - startX, freed.y - startY) > 40,
+    `a player inside cover must be able to walk out (moved ${Math.hypot(freed.x - startX, freed.y - startY).toFixed(1)})`,
+);
+const stillPenned = freed.x > pen.x && freed.x < pen.x + pen.width && freed.y > pen.y && freed.y < pen.y + pen.height;
+assert.equal(stillPenned, false, "walking out of a block must actually clear it");
+
+// A new level re-draws its floor plan around a player who never moved, so the
+// plan can put a block on top of them. Sweep the whole spread of archetypes.
+for (let level = 1; level <= 40; level += 1) {
+    const redrawn = new GameCore();
+    redrawn.reset(0x00c0_5e00 + level);
+    redrawn.forcePlayerAt(WORLD_WIDTH * 0.66, WORLD_HEIGHT * 0.66);
+    redrawn.forceLevel(level);
+    const stood = redrawn.snapshot().player;
+    for (const rect of redrawn.snapshot().cover) {
+        const embedded =
+            stood.x >= rect.x - PLAYER_RADIUS &&
+            stood.x <= rect.x + rect.width + PLAYER_RADIUS &&
+            stood.y >= rect.y - PLAYER_RADIUS &&
+            stood.y <= rect.y + rect.height + PLAYER_RADIUS;
+        assert.equal(embedded, false, `level ${level} laid a block on top of the player`);
+    }
+}
+
+// A hostile inside a block is worse than a stuck player: cover eats bullets, so
+// it cannot be shot, and the page can never clear.
+const penned = new GameCore();
+penned.reset(0x00c0_5e02);
+penned.forceEnemy("grunt", 300, 0);
+const pennedBlock = penned.snapshot().cover[0];
+assert.ok(pennedBlock);
+const hostile = penned.snapshot().enemies[0];
+assert.ok(hostile, "the QA hook must place a hostile to pen");
+penned.forceEnemyAt(0, pennedBlock.x + pennedBlock.width / 2, pennedBlock.y + pennedBlock.height / 2);
+const pennedX = penned.snapshot().enemies[0]?.x ?? 0;
+const pennedY = penned.snapshot().enemies[0]?.y ?? 0;
+penned.forcePlayerAt(WORLD_MARGIN + 60, WORLD_MARGIN + 60);
+for (let frame = 0; frame < 480; frame += 1) {
+    penned.setInput({ moveX: 0, moveY: 0, aimX: WORLD_WIDTH, aimY: WORLD_HEIGHT, firing: false });
+    penned.update(STEP);
+    if (penned.snapshot().phase !== "running") break;
+}
+const walker = penned.snapshot().enemies[0];
+if (walker) {
+    assert.ok(
+        Math.hypot(walker.x - pennedX, walker.y - pennedY) > 20,
+        `a hostile inside cover must be able to walk out (moved ${Math.hypot(walker.x - pennedX, walker.y - pennedY).toFixed(1)})`,
+    );
+}
 
 /* ------------------------------------------------------- 7. level jumping */
 

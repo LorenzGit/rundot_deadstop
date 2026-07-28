@@ -341,6 +341,20 @@ export class GameCore {
         this.boosters[id] = Math.min(BOOSTERS[id].maxStacks, this.boosters[id] + 1);
     }
 
+    /** Drops the player at a point, cover or not. Development QA only. */
+    forcePlayerAt(x: number, y: number): void {
+        this.player.x = clamp(x, WORLD_MARGIN, WORLD_WIDTH - WORLD_MARGIN);
+        this.player.y = clamp(y, WORLD_MARGIN, WORLD_HEIGHT - WORLD_MARGIN);
+    }
+
+    /** Drops a hostile at a point, cover or not. Development QA only. */
+    forceEnemyAt(index: number, x: number, y: number): void {
+        const enemy = this.enemies[index];
+        if (!enemy) return;
+        enemy.x = clamp(x, WORLD_MARGIN, WORLD_WIDTH - WORLD_MARGIN);
+        enemy.y = clamp(y, WORLD_MARGIN, WORLD_HEIGHT - WORLD_MARGIN);
+    }
+
     /** Opens the between-level draft immediately. Development QA only. */
     forceDraft(): void {
         if (this.phase === "defeat" || this.phase === "idle") return;
@@ -542,9 +556,48 @@ export class GameCore {
         radius: number,
     ): { x: number; y: number } {
         for (const rect of this.cover) {
-            if (pointInRect(toX, toY, rect, radius)) return { x: fromX, y: fromY };
+            if (!pointInRect(toX, toY, rect, radius)) continue;
+            // A block the body is already inside is something to escape, not a
+            // wall to be held against. Testing only the destination meant that
+            // once a figure overlapped a block every direction read as blocked
+            // — including the way out — and it could never move again. Cover
+            // still cannot be entered from outside, so this only ever frees a
+            // figure that was placed inside one.
+            if (pointInRect(fromX, fromY, rect, radius)) continue;
+            return { x: fromX, y: fromY };
         }
         return { x: toX, y: toY };
+    }
+
+    /**
+     * Moves a point to the nearest spot clear of cover. Levels re-draw their
+     * floor plan around whoever is standing there, so a fresh block can land on
+     * top of a figure; this walks it out the shortest edge rather than leaving
+     * it embedded.
+     */
+    private ejectFromCover(x: number, y: number, radius: number): { x: number; y: number } {
+        let outX = x;
+        let outY = y;
+        // One pass per block, twice over: sliding clear of one block can push a
+        // point into a neighbour.
+        for (let pass = 0; pass < 2; pass += 1) {
+            for (const rect of this.cover) {
+                if (!pointInRect(outX, outY, rect, radius)) continue;
+                const left = outX - (rect.x - radius);
+                const right = rect.x + rect.width + radius - outX;
+                const up = outY - (rect.y - radius);
+                const down = rect.y + rect.height + radius - outY;
+                const shortest = Math.min(left, right, up, down);
+                if (shortest === left) outX = rect.x - radius - 1;
+                else if (shortest === right) outX = rect.x + rect.width + radius + 1;
+                else if (shortest === up) outY = rect.y - radius - 1;
+                else outY = rect.y + rect.height + radius + 1;
+            }
+        }
+        return {
+            x: clamp(outX, WORLD_MARGIN, WORLD_WIDTH - WORLD_MARGIN),
+            y: clamp(outY, WORLD_MARGIN, WORLD_HEIGHT - WORLD_MARGIN),
+        };
     }
 
     private updatePlayerWeapon(realDelta: number): void {
@@ -1057,7 +1110,14 @@ export class GameCore {
                 WORLD_MARGIN * 0.5,
                 WORLD_HEIGHT - WORLD_MARGIN * 0.5,
             );
-            if (this.cover.some((rect) => pointInRect(nextX, nextY, rect, enemy.radius))) continue;
+            // Same rule as the player: a block this figure is already inside
+            // must not block the way out of it. Cover eats bullets, so an
+            // embedded hostile is unkillable and the page could never clear.
+            const walled = this.cover.some(
+                (rect) =>
+                    pointInRect(nextX, nextY, rect, enemy.radius) && !pointInRect(enemy.x, enemy.y, rect, enemy.radius),
+            );
+            if (walled) continue;
             enemy.x = nextX;
             enemy.y = nextY;
             return;
@@ -1279,6 +1339,13 @@ export class GameCore {
         this.plan = this.planLevel(level);
         this.cover = this.layoutCover(this.plan);
         this.outlines = [];
+        // The floor plan is re-drawn around a player who never moved, so a
+        // block can land on top of them. Only the room's centre is guaranteed
+        // clear, and by the end of a level they are rarely standing in it.
+        // Step them out rather than dropping a block from a hand-drawn plan.
+        const clear = this.ejectFromCover(this.player.x, this.player.y, PLAYER_RADIUS);
+        this.player.x = clear.x;
+        this.player.y = clear.y;
         this.drops = this.drops.filter((drop) => !this.coverBlocks(drop.x, drop.y));
         this.player.shields = this.boosters.second_skin;
         this.player.graceFor = Math.max(this.player.graceFor, PLAYER_SPAWN_GRACE_SECONDS);
@@ -1478,10 +1545,14 @@ export class GameCore {
             if (this.coverBlocks(x, y)) continue;
             return { x, y };
         }
-        return {
-            x: this.player.x > WORLD_WIDTH / 2 ? WORLD_MARGIN + 40 : WORLD_WIDTH - WORLD_MARGIN - 40,
-            y: clamp(WORLD_HEIGHT - this.player.y, WORLD_MARGIN, WORLD_HEIGHT - WORLD_MARGIN),
-        };
+        // Every sampled edge point was rejected, so fall back to the far side.
+        // That corner is picked blind, so clear it of cover before using it —
+        // it is the one path that can put a hostile inside a block.
+        return this.ejectFromCover(
+            this.player.x > WORLD_WIDTH / 2 ? WORLD_MARGIN + 40 : WORLD_WIDTH - WORLD_MARGIN - 40,
+            clamp(WORLD_HEIGHT - this.player.y, WORLD_MARGIN, WORLD_HEIGHT - WORLD_MARGIN),
+            definition.radius,
+        );
     }
 
     private coverBlocks(x: number, y: number): boolean {
