@@ -59,6 +59,17 @@ All three are non-consumable, unique, refund-eligible for 24 hours, and gated
 behind the value moment: the Ledger Pack after one completed run, the other two
 after two.
 
+### Consumables are never "owned"
+
+`ProductCommerceView.owned` is only meaningful for something you can own once.
+Ink cases are consumables with an empty `expectedEntitlementIds`, and
+`[].every()` is vacuously `true` — so the moment entitlements loaded, all three
+reported `owned: true`, rendered `OWNED`, and became impossible to buy.
+
+Ownership now requires a non-empty entitlement list *and* a non-consumable kind.
+Both guards are deliberate: the first is the structural trap, the second is the
+semantics.
+
 ### The RB anchor
 
 **1 RB = 1 US cent**, verified against the live RUN Bits purchase screen on

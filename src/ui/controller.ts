@@ -1255,6 +1255,32 @@ export class UiController {
         }
     }
 
+    /**
+     * An ad is presented by the host, over or beside this document. Keyboard
+     * focus goes with it and does not necessarily come back, which leaves the
+     * window listeners deaf: pointer input still lands on the canvas, so the
+     * game looks alive while WASD does nothing at all.
+     *
+     * So the game takes its own focus back on the way out, and drops any key it
+     * thought was held on the way in — a key released during the ad never sent
+     * us a keyup.
+     */
+    handleAdPresentation(visible: boolean): void {
+        this.keys.clear();
+        this.mouseFiring = false;
+        this.buttonFiring = false;
+        this.aimTapFire = false;
+        this.releaseStick();
+        this.releaseAim();
+        if (visible) return;
+        try {
+            window.focus();
+            this.appFrame.focus({ preventScroll: true });
+        } catch {
+            // A host that refuses focus is not a reason to break the return.
+        }
+    }
+
     private setInputEnabled(enabled: boolean): void {
         this.inputEnabled = enabled;
         if (!enabled) {

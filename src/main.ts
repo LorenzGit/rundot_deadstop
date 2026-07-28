@@ -89,6 +89,15 @@ let coachY = 0;
 const HIT_STOP_SECONDS = 0.055;
 const HIT_STOP_HEAVY_SECONDS = 0.1;
 
+/**
+ * Every ad goes through here: the score ducks while it plays, and the game
+ * reclaims keyboard focus and clears stale key state when it ends.
+ */
+function onAdPresentation(visible: boolean): void {
+    audioManager.setPaused(visible);
+    ui.handleAdPresentation(visible);
+}
+
 function updateBoot(progress: number, copy: string): void {
     const fill = document.getElementById("boot-fill");
     const label = document.getElementById("boot-copy");
@@ -220,7 +229,7 @@ async function refreshMonetization(): Promise<void> {
 
 async function exitResults(destination: "retry" | "menu", rewardedInteracted: boolean): Promise<void> {
     recordAnalytics("results_exit_tapped", { destination, rewardedInteracted });
-    await maybeShowResultsInterstitial(rewardedInteracted, (visible) => audioManager.setPaused(visible));
+    await maybeShowResultsInterstitial(rewardedInteracted, onAdPresentation);
     if (destination === "retry") startRun();
     else backToMenu();
 }
@@ -564,12 +573,12 @@ async function boot(): Promise<void> {
             return monetizationDiagnosticsView();
         },
         onTestRewardedAd: async () => {
-            const outcome = await testRewardedAd((visible) => audioManager.setPaused(visible));
+            const outcome = await testRewardedAd(onAdPresentation);
             return outcome.message;
         },
-        onTestInterstitialAd: async () => testInterstitialAd((visible) => audioManager.setPaused(visible)),
+        onTestInterstitialAd: async () => testInterstitialAd(onAdPresentation),
         onClaimSecondWind: async () => {
-            const outcome = await claimSecondWind(runRevives, (visible) => audioManager.setPaused(visible));
+            const outcome = await claimSecondWind(runRevives, onAdPresentation);
             if (outcome.granted) {
                 // The run is un-banked: the score keeps climbing on the same page.
                 runBanked = false;

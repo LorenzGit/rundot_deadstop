@@ -221,7 +221,13 @@ export function productCommerceView(productId: CommerceProductId): ProductCommer
     const hostReady = controlsEnabled && capabilities.shop && !capabilities.mock && item !== null;
     const devPreview = import.meta.env.DEV && (!capabilities.host || capabilities.mock);
     const eligible = productIsEligible(productId);
+    // Ownership is only meaningful for something you can own once. A consumable
+    // is always buyable again, and its entitlement list is empty — and an empty
+    // list satisfies `every()` vacuously, which is what silently marked every
+    // ink case OWNED and made it impossible to buy.
     const owned =
+        definition.kind !== "consumable" &&
+        definition.expectedEntitlementIds.length > 0 &&
         authoritativeEntitlementsLoaded &&
         definition.expectedEntitlementIds.every((entitlementId) => entitlementIds.has(entitlementId));
     const requiredRuns = requiredRunsForProduct(productId);
@@ -246,7 +252,9 @@ export function productCommerceView(productId: CommerceProductId): ProductCommer
               : devPreview
                 ? `${DEV_PREVIEW_PRICES[productId]} · PREVIEW`
                 : hostReady
-                  ? "PERMANENT UNLOCK"
+                  ? definition.kind === "consumable"
+                      ? formatLivePrice(item)
+                      : "PERMANENT UNLOCK"
                   : "SYNCING OFFER",
         name: item?.name ?? definition.catalogItemId,
     };

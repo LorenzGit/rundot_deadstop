@@ -532,6 +532,45 @@ assert.match(
     "rewarded completions must be recorded so one run cannot bank two revives",
 );
 assert.match(main, /if \(outcome\.granted\)/, "the revive must only follow a host-confirmed completion");
+
+// An ad is presented by the host, over or beside this document, and keyboard
+// focus goes with it. Every ad must route through the one handler that takes
+// focus back and drops keys whose keyup was swallowed, or the game comes back
+// looking alive while WASD does nothing.
+assert.match(
+    main,
+    /function onAdPresentation\(visible: boolean\): void \{/,
+    "ads need one shared presentation handler",
+);
+assert.doesNotMatch(
+    main,
+    /\(visible\) => audioManager\.setPaused\(visible\)/,
+    "no ad may duck the score without also restoring input",
+);
+for (const site of [
+    /maybeShowResultsInterstitial\(rewardedInteracted, onAdPresentation\)/,
+    /testRewardedAd\(onAdPresentation\)/,
+    /testInterstitialAd\(onAdPresentation\)/,
+    /claimSecondWind\(runRevives, onAdPresentation\)/,
+]) {
+    assert.match(main, site, "every ad call site must route through the shared presentation handler");
+}
+assert.match(controller, /handleAdPresentation\(visible: boolean\): void \{/, "the controller must handle ad focus");
+assert.match(controller, /this\.appFrame\.focus\(\{ preventScroll: true \}\);/, "the game must take its focus back");
+assert.match(html, /id="app-frame" tabindex="-1"/, "the frame must be focusable for focus to return to it");
+
+// `[].every()` is true, so an empty entitlement list silently marks a product
+// owned. That is exactly what made every ink case unbuyable.
+assert.match(
+    commerce,
+    /definition\.kind !== "consumable" &&/,
+    "a consumable can always be bought again and must never read as owned",
+);
+assert.match(
+    commerce,
+    /definition\.expectedEntitlementIds\.length > 0 &&/,
+    "an empty entitlement list must never satisfy ownership vacuously",
+);
 // A configured placement with no call site is an ad that never runs — and here
 // it would be an ad the 299-buck ad-free product claims to remove.
 assert.match(
