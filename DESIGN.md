@@ -94,25 +94,24 @@ Being unarmed is a real state: you cannot punch, you can only run and pick up.
 Every shot is lethal to any body it touches except the TANK, which soaks 3.
 Damage numbers exist only so the tank has a shape; there is no health economy.
 
-**Thrown guns.** Running a gun dry throws it. `THROW_AFTER_DRY_WORLD_SECONDS =
-0.3` **world** seconds after the round that empties the magazine, the frame
-follows it out along the same aim: a spinning body that kills on contact for the
-game's highest style multiplier (`x3`) and then falls out of play.
+**Thrown guns.** A dry gun is thrown by a fresh pull of the trigger: a spinning
+body that kills on contact for the game's highest style multiplier (`x3`), then
+falls out of play.
 
-The wait is on the world clock, not the wall clock, and that distinction is the
-whole fix. A real-time beat looked correct in isolation and wrong in play:
-standing still holds the clock at its floor, so the last round *hangs in the
-air* — and a gun thrown on a wall-clock timer launched straight past it, two
-objects leaving the muzzle together along one line. On world time the frame
-waits exactly as the round does. Hold the page and it stays in your hand with
-everything else; move, and it follows the round out with real distance between
-them (measured: `147` units moving, `189` standing still, against `0` before).
+**Holding the trigger is one act of shooting, start to finish.** It empties the
+gun and stops there. The round that runs the magazine out must never also fling
+the frame, because the player never asked for that — they were still holding the
+same button they started shooting with. Release, press again, and the gun goes.
 
-`THROW_MAX_WAIT_SECONDS = 2.5` real seconds is a backstop for a player who
-empties a gun and then never moves again.
+That edge is also what separates the two acts on screen. Earlier attempts used a
+timer, first in real seconds and then in world seconds, and both were wrong. A
+wall-clock delay fired while the last round was still hanging in the air, so the
+gun launched alongside it down the same line; moving the timer onto the world
+clock widened the gap but still threw a gun the player had not asked to throw.
+No timer can tell a deliberate throw from a held button. The release can.
 
-While the throw is pending the trigger does nothing, which is also what stops a
-dry gun being fired into negative rounds.
+A dry gun never traps the player: walking over any loaded drop always swaps,
+whatever is in hand.
 
 **Throwing has no verb.** There is no `F`, no right click, and no THROW button.
 Those existed only so an empty gun was not dead weight, which made "an empty gun

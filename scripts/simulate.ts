@@ -31,7 +31,6 @@ import {
     ROSTER_HARD_CAP,
     rewardForLevel,
     STYLE_HEADSHOT,
-    THROW_AFTER_DRY_WORLD_SECONDS,
     TIME_FLOOR,
     WEAPONS,
     WORLD_HEIGHT,
@@ -612,8 +611,7 @@ economy.reset(0x00c0_ffee);
 economy.forceWeapon("pistol", 3);
 assert.equal(economy.snapshot().player.weapon?.rounds, 3);
 let emptyShots = 0;
-let throws = 0;
-let roundsWhenEmptied = -1;
+let throwsWhileHeld = 0;
 for (let frame = 0; frame < 1800; frame += 1) {
     const player = economy.snapshot().player;
     if (!player.alive) break;
@@ -621,102 +619,15 @@ for (let frame = 0; frame < 1800; frame += 1) {
     economy.update(STEP);
     for (const event of economy.drainEvents()) {
         if (event.type === "shot") emptyShots += 1;
-        if (event.type === "throw") {
-            throws += 1;
-            if (roundsWhenEmptied < 0) roundsWhenEmptied = emptyShots;
-        }
+        if (event.type === "throw") throwsWhileHeld += 1;
     }
-    if (throws > 0) break;
 }
-assert.ok(economy.snapshot().player.alive, "a stationary shooter must survive a frozen page");
+assert.equal(economy.snapshot().player.alive, true, "a stationary shooter must survive a frozen page");
 assert.equal(emptyShots, 3, "firing must consume every round and then stop shooting");
-// An empty gun is still a weapon: the trigger the player already knows throws
-// the frame rather than clicking uselessly, so there is no dead state and no
-// separate verb to discover.
-assert.equal(throws, 1, "holding the trigger on an empty gun must throw it, not click");
-assert.equal(roundsWhenEmptied, 3, "the throw must come after the last round, never instead of one");
-assert.equal(economy.snapshot().player.weapon, null, "the thrown frame must leave the player's hands");
-assert.ok(
-    economy.snapshot().thrown.length > 0 || economy.snapshot().drops.length > 0,
-    "the thrown gun must exist in the world as a projectile or a pickup",
-);
-
-// The last round and the frame that fired it must never leave the muzzle
-// together. Testing that the two events land on different frames is not enough
-// — the round stays in the air, so a gun thrown a wall-clock beat later still
-// travels the same line beside it. What matters is the distance between them.
-const MIN_THROW_SEPARATION = 90;
-for (const moving of [true, false]) {
-    const core = new GameCore();
-    core.reset(0x00c0_ffee);
-    core.forceWeapon("pistol", 1);
-    core.forceEnemy("grunt", 300, 0);
-    let shotAt = -1;
-    let throwAt = -1;
-    let separation = -1;
-    let resolved = false;
-    let extraShots = 0;
-    for (let frame = 0; frame < 900; frame += 1) {
-        const before = core.snapshot();
-        core.setInput({
-            moveX: moving ? 1 : 0,
-            moveY: 0,
-            aimX: before.player.x + 400,
-            aimY: before.player.y,
-            // Hold the trigger down: a dry gun must not keep firing while it waits.
-            firing: true,
-        });
-        core.update(STEP);
-        const after = core.snapshot();
-        for (const event of core.drainEvents()) {
-            if (event.type === "shot") {
-                if (shotAt < 0) shotAt = frame;
-                else extraShots += 1;
-            }
-            if (event.type === "throw" && throwAt < 0) {
-                throwAt = frame;
-                const gun = after.thrown.at(-1);
-                const round = after.bullets.find((bullet) => bullet.owner === "player");
-                resolved = !round;
-                separation = round && gun ? Math.hypot(round.x - gun.x, round.y - gun.y) : Number.POSITIVE_INFINITY;
-            }
-        }
-        if (throwAt >= 0) break;
-    }
-    const how = moving ? "moving" : "standing still";
-    assert.ok(shotAt >= 0, `${how}: the last round must be fired`);
-    assert.ok(throwAt > shotAt, `${how}: the throw must not share the shot's frame`);
-    assert.equal(extraShots, 0, `${how}: a dry gun awaiting its throw must never fire again`);
-    assert.ok(
-        resolved || separation >= MIN_THROW_SEPARATION,
-        `${how}: the round was only ${separation.toFixed(0)} units clear of the gun — they read as one act`,
-    );
-}
-
-// Holding the page freezes the pending frame along with everything else, which
-// is the whole fiction; the backstop only saves a player who never moves again.
-assert.ok(THROW_AFTER_DRY_WORLD_SECONDS > 0, "the frame must wait on the world clock, not leave instantly");
-
-// A spent frame is litter, not loot: picking one up would only arm the throw
-// again, so it must not land as a pickup.
-const litter = new GameCore();
-litter.reset(0x00c0_ffee);
-litter.forceWeapon("pistol", 1);
-const litterPlayer = litter.snapshot().player;
-const dropsBefore = litter.snapshot().drops.length;
-litter.setInput({ moveX: 0, moveY: 0, aimX: litterPlayer.x + 40, aimY: litterPlayer.y, firing: true });
-for (let frame = 0; frame < 240; frame += 1) {
-    litter.update(STEP);
-    if (litter.snapshot().thrown.length === 0 && litter.snapshot().player.weapon === null) break;
-}
-assert.ok(
-    litter.snapshot().drops.length <= dropsBefore + 1,
-    "an empty thrown gun must not litter the page with a useless pickup",
-);
-assert.ok(
-    litter.snapshot().drops.every((drop) => drop.weapon.rounds > 0),
-    "every pickup on the page must actually be worth picking up",
-);
+// Holding the trigger is one act of shooting from start to finish. It empties
+// the gun and stops there; it never also flings it.
+assert.equal(throwsWhileHeld, 0, "a held trigger must never throw the gun it just emptied");
+assert.equal(economy.snapshot().player.weapon?.rounds, 0, "the spent frame stays in hand, at zero rounds");
 
 /* --------------------------------------------------------- 6. cover walls */
 

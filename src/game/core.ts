@@ -64,8 +64,6 @@ import {
     STYLE_POINT_BLANK,
     STYLE_STILL,
     STYLE_THROWN,
-    THROW_AFTER_DRY_WORLD_SECONDS,
-    THROW_MAX_WAIT_SECONDS,
     THROW_RADIUS,
     THROW_RANGE_SECONDS,
     THROW_SPEED,
@@ -174,10 +172,8 @@ export class GameCore {
     private aimTargetY = WORLD_HEIGHT / 2;
     private firing = false;
     private swapRequested = false;
-    /** World seconds a spent frame has waited to leave the player's hands. */
-    private pendingThrow = 0;
-    /** Real seconds of the same wait, so a motionless player is never stuck. */
-    private pendingThrowReal = 0;
+    /** True while the trigger that emptied the gun is still held down. */
+    private dryTriggerHeld = false;
 
     private timeScale = TIME_FLOOR;
     private firePulse = 0;
@@ -234,8 +230,7 @@ export class GameCore {
         this.moveY = 0;
         this.firing = false;
         this.swapRequested = false;
-        this.pendingThrow = 0;
-        this.pendingThrowReal = 0;
+        this.dryTriggerHeld = false;
         this.timeScale = this.timeFloor();
         this.firePulse = 0;
         this.throwPulse = 0;
@@ -388,7 +383,7 @@ export class GameCore {
 
         this.movePlayer(realDelta);
         this.updateStillness(worldDelta);
-        this.updatePlayerWeapon(worldDelta, realDelta);
+        this.updatePlayerWeapon(worldDelta);
         if (this.isDefeated()) return;
 
         this.updateBullets(worldDelta);
@@ -541,36 +536,32 @@ export class GameCore {
         return { x: toX, y: toY };
     }
 
-    private updatePlayerWeapon(worldDelta: number, realDelta: number): void {
+    private updatePlayerWeapon(worldDelta: number): void {
         if (!this.player.alive) {
             this.swapRequested = false;
-            this.pendingThrow = 0;
-            this.pendingThrowReal = 0;
+            this.dryTriggerHeld = false;
             return;
         }
         this.player.cooldown = Math.max(0, this.player.cooldown - worldDelta);
 
-        // The spent frame waits on the world clock, exactly as the round it
-        // just fired does, so the two never leave the muzzle together.
-        if (this.pendingThrow > 0) {
-            this.pendingThrow += worldDelta;
-            this.pendingThrowReal += realDelta;
-            if (this.pendingThrow >= THROW_AFTER_DRY_WORLD_SECONDS || this.pendingThrowReal >= THROW_MAX_WAIT_SECONDS) {
-                this.pendingThrow = 0;
-                this.pendingThrowReal = 0;
-                this.throwWeapon();
-            }
-        }
+        // Letting go of the trigger is what arms the throw. Holding it down is
+        // one continuous act of shooting, so the round that empties the gun
+        // must not also fling it — the player never asked for that. Release,
+        // press again, and the frame goes.
+        if (!this.firing) this.dryTriggerHeld = false;
 
         this.tryPickup();
 
         if (!this.firing || this.phase !== "running") return;
         const weapon = this.player.weapon;
         if (!weapon) return;
+        if (weapon.rounds <= 0) {
+            // A fresh press on a dry gun throws it. The hold that emptied it
+            // does not, and it can never fire past empty either.
+            if (!this.dryTriggerHeld) this.throwWeapon();
+            return;
+        }
         if (this.player.cooldown > 0) return;
-        // A dry gun is already on its way out of the player's hands. Without
-        // this the trigger would keep firing it into negative rounds.
-        if (weapon.rounds <= 0) return;
         this.firePlayerWeapon(weapon);
     }
 
@@ -612,8 +603,8 @@ export class GameCore {
         // round that empties it is immediately followed by the frame itself,
         // thrown along the same aim. There is nothing to learn and nothing dead
         // to carry.
-        // Any non-zero value arms the wait; it counts up from here.
-        if (weapon.rounds <= 0) this.pendingThrow = Number.EPSILON;
+        // This trigger pull emptied the gun, so it must not also throw it.
+        if (weapon.rounds <= 0) this.dryTriggerHeld = true;
     }
 
     private throwWeapon(): void {

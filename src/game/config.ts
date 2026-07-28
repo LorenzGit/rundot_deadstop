@@ -170,24 +170,6 @@ export function rewardForLevel(level: number): { weapon: WeaponId; bonusRounds: 
     };
 }
 
-/**
- * When the spent frame follows its last round out.
- *
- * This runs on **world** time, like everything else the world does. A real-time
- * timer looked right in isolation and wrong in play: standing still holds the
- * clock at its floor, so the last round hangs in the air — and a gun thrown on
- * a wall-clock beat launched straight past it, two objects leaving the muzzle
- * together along one line. That is the thing that reads as shooting and
- * throwing at once.
- *
- * On world time the frame waits exactly as the round does. Hold the page and it
- * stays in your hand with everything else; move, and it follows the round out
- * with real distance between them. The real-time backstop only exists so a
- * player who empties a gun and then never moves again is not left holding it
- * forever.
- */
-export const THROW_AFTER_DRY_WORLD_SECONDS = 0.3;
-export const THROW_MAX_WAIT_SECONDS = 2.5;
 export const THROW_SPEED = 520;
 export const THROW_SPIN = 15;
 export const THROW_RADIUS = 13;

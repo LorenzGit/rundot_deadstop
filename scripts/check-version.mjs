@@ -317,33 +317,26 @@ assert.match(html, /id="key-legend"/, "desktop players need the controls on scre
 assert.match(html, /<kbd>W<\/kbd><kbd>A<\/kbd><kbd>S<\/kbd><kbd>D<\/kbd>/, "the legend must show how to move");
 // An empty gun is still a weapon, and the trigger the player already knows is
 // what throws it — no separate verb to discover, and it still goes where they
-// are aiming, which an automatic throw on the last round could not.
-// Throwing has no verb. The round that empties the gun is followed by the frame
-// itself, so there is no control to find, no dead click, and nothing to teach.
+// Holding the trigger is one continuous act of shooting. Riding that same hold
+// into a throw means the player never chose to throw at all — and no timer can
+// tell a deliberate throw from a held button. The release can.
 assert.match(
     core,
-    /if \(weapon\.rounds <= 0\) this\.pendingThrow = Number\.EPSILON;/,
-    "running dry must arm the throw",
-);
-// The round and the frame must not leave the muzzle together. A wall-clock beat
-// is not enough: the round hangs in the air on a held page, so the gun has to
-// wait on the same clock the round does.
-assert.match(config, /export const THROW_AFTER_DRY_WORLD_SECONDS/, "the wait must be measured in world time");
-assert.match(
-    core,
-    /this\.pendingThrow \+= worldDelta;/,
-    "the frame must wait on the world clock, exactly as the round it fired does",
+    /if \(weapon\.rounds <= 0\) this\.dryTriggerHeld = true;/,
+    "the trigger pull that empties a gun must mark itself, so it cannot also throw it",
 );
 assert.match(
     core,
-    /this\.pendingThrowReal \+= realDelta;/,
-    "a real-time backstop must exist so a motionless player is never stuck holding a spent frame",
+    /if \(!this\.firing\) this\.dryTriggerHeld = false;/,
+    "releasing the trigger is what arms the throw",
 );
 assert.match(
     core,
-    /if \(weapon\.rounds <= 0\) return;\s*\n\s*this\.firePlayerWeapon\(weapon\);/,
-    "a dry gun awaiting its throw must not keep firing into negative rounds",
+    /if \(!this\.dryTriggerHeld\) this\.throwWeapon\(\);/,
+    "only a fresh press on a dry gun may throw it",
 );
+assert.doesNotMatch(core, /pendingThrow/, "the throw is driven by the trigger edge, not by a timer");
+assert.doesNotMatch(config, /THROW_AFTER_DRY/, "no delay constant should survive the trigger-edge rule");
 assert.doesNotMatch(core, /requestThrow/, "there is no manual throw left to request");
 assert.doesNotMatch(controller, /onThrow/, "no input may ask for a throw");
 assert.doesNotMatch(html, /throw-button/, "the THROW button is gone; running dry throws for you");

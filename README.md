@@ -11,7 +11,7 @@ DEADSTOP is an ink-on-paper stick-figure roguelike gunfight built for
 motion: stand still and the bullets hang in the air like pins on a corkboard;
 move, swing your aim, or pull the trigger and the whole firefight surges
 forward. Every gun has a hard round count, and when it runs dry the gun itself
-is the last thing you can throw — and it throws itself, the moment it runs dry.
+is the last thing you can throw.
 
 It plays in landscape, on desktop with mouse and keyboard or on touch with two
 thumbs, and it renders with PixiJS 8 on a WebGPU-first path with an automatic
@@ -24,7 +24,7 @@ WebGL fallback.
 2. **Spend the clock.** Every step, every degree of aim, and every shot pushes
    time forward for everyone else too.
 3. **Count your rounds.** The pistol holds seven. Kill a grunt and take theirs,
-   The frame throws itself at whatever you were shooting the moment it runs dry.
+   Once it is dry, one more click sends the frame itself downrange.
 4. **Clear the level.** Every cleared level inks a bigger gun at your feet:
    SMG, shotgun, rifle, launcher, then round again with extra rounds.
 5. **Pick a booster.** Between levels the run stops on a three-card draft. One
@@ -63,7 +63,7 @@ with ink earned from play.
 | --- | --- | --- |
 | Move | `WASD` or arrow keys | The `MOVE` stick, bottom left |
 | Aim and fire | Mouse aims, left click fires | **Tap a spot to shoot that spot**; hold to keep firing |
-| Throw the gun | Automatic when it runs dry | Automatic when it runs dry |
+| Throw the gun | Click again once it is dry | Tap again once it is dry |
 | Swap over a gun | `E` | Walk over it while empty |
 | Pick a booster | `1` / `2` / `3` | Tap a card |
 | Pause | `Esc` or `P` | Pause button |
