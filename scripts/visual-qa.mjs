@@ -517,6 +517,27 @@ try {
     }
     console.log(`SHEET_ACTIONS reachable on every sheet at ${insetHud.w}x${insetHud.h} with host insets`);
 
+    // The draft always deals exactly three cards. Any layout that fits two but
+    // not three orphans the last one in a half-empty row, which is what
+    // auto-fit did at a phone's sheet width.
+    await evaluate("window.__deadstopQa.startRun(); window.__deadstopQa.forceDraft()");
+    await delay(400);
+    const draftRows = await evaluate(`(() => {
+        const cards = [...document.querySelectorAll("#draft-cards .draft-card")];
+        const rows = new Map();
+        for (const card of cards) {
+            const top = Math.round(card.getBoundingClientRect().top);
+            rows.set(top, (rows.get(top) ?? 0) + 1);
+        }
+        const perRow = [...rows.values()];
+        return JSON.stringify({ cards: cards.length, perRow });
+    })()`).then(JSON.parse);
+    console.log(`DRAFT_GRID ${JSON.stringify(draftRows)}`);
+    if (draftRows.cards !== 3) throw new Error(`the draft must deal three cards, saw ${draftRows.cards}`);
+    if (new Set(draftRows.perRow).size > 1) {
+        throw new Error(`the draft grid orphaned a card: rows of ${draftRows.perRow.join(", ")}`);
+    }
+
     await capture(shot("phone-host-insets"));
     await command("Emulation.setTouchEmulationEnabled", { enabled: false });
 
