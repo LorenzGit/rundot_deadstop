@@ -71,6 +71,15 @@ assert.match(
 );
 assert.match(core, /this\.updateEnemies\(worldDelta\)/, "hostiles must obey the clock");
 assert.match(html, /id="time-fill"/, "the clock must be readable in the HUD");
+assert.match(html, /<span>TIME SPEED<\/span>/, "the clock readout must say what it measures");
+// The clock reads danger, so a genuinely clear page runs at normal speed —
+// but a queued group still counts as occupied, or the contract would break on
+// the first frame of every run, before the opening group is placed.
+assert.match(
+    core,
+    /const clear = this\.enemies\.length === 0 && this\.pendingSpawnCount\(\) === 0 \? 1 : 0;/,
+    "an empty page must open the clock, and pending spawns must not count as empty",
+);
 assert.match(main, /audioManager\.setTension\(/, "the score must follow the clock");
 
 /* ------------------------------------------------------- 3. no dead-end page */
@@ -183,6 +192,14 @@ assert.match(scene, /private redrawGrain\(/, "the paper tooth must be drawn once
 assert.match(scene, /private drawOverlay\(/, "the screen-space flash must be its own pass");
 assert.match(scene, /this\.coverDraw/, "a level must ink its floor plan in rather than snapping it into place");
 assert.match(scene, /leanTargetX/, "the page must lean with the aim and kick against the shot");
+// A tank's head is drawn 1.22x scale and reaches y-45; a hard-coded y-46 put
+// the soak bar on its skull. Anchor it to the head the renderer actually drew.
+assert.match(
+    scene,
+    /const headTop = \(FIGURE_HEAD_Y - FIGURE_HEAD_RADIUS\) \* scale;/,
+    "the soak bar must clear the head the renderer actually drew, at any figure scale",
+);
+assert.match(scene, /const startX = enemy\.x - span \/ 2;/, "the soak bar must stay centred as deep pages add soak");
 assert.match(main, /HIT_STOP_SECONDS/, "kills must land with a held beat");
 assert.match(
     main,

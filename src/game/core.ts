@@ -471,7 +471,18 @@ export class GameCore {
         const moveAgency = clamp(length(this.moveX, this.moveY), 0, 1);
         const aimAgency = clamp(this.aimRate / TIME_AIM_FULL_RATE, 0, 1) * TIME_AIM_WEIGHT;
         const pulse = this.firePulse > 0 || this.throwPulse > 0 ? 1 : 0;
-        const target = clamp(Math.max(floor, moveAgency, aimAgency, pulse), floor, 1);
+        // The clock is a readout of danger, not a punishment for standing still.
+        // Once the page is genuinely clear there is nothing to read and nothing
+        // to dodge, so holding the player at a crawl only makes them wait while
+        // they walk to the reward gun. Time runs normally until the next body.
+        //
+        // Queued spawns still count as occupied. A group walking in is the most
+        // tense beat the game has, and treating the gap between waves as "empty"
+        // would open the clock right as they arrive — and would break the
+        // Standstill contract on the very first frame of a run, before the
+        // opening group has been placed.
+        const clear = this.enemies.length === 0 && this.pendingSpawnCount() === 0 ? 1 : 0;
+        const target = clamp(Math.max(floor, moveAgency, aimAgency, pulse, clear), floor, 1);
         const rate = target > this.timeScale ? TIME_ATTACK_RATE : TIME_RELEASE_RATE;
         this.timeScale += (target - this.timeScale) * clamp(rate * realDelta, 0, 1);
         this.timeScale = clamp(this.timeScale, floor, 1);

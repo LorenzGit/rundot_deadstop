@@ -36,10 +36,19 @@ they disagree, fix the code or update this file in the same change.
 | Firing | pulse of `1.0` held for `0.14` real seconds |
 | Throwing a gun | pulse of `1.0` held for `0.20` real seconds |
 | Floor (never fully frozen) | `0.045` |
+| A genuinely clear page | `1.0` |
 
 Smoothing is asymmetric: attack `18/s`, release `6/s`. Rising to speed is
 instant enough to feel like agency; falling back to standstill has a visible
 glide so the player can watch the world settle.
+
+**A clear page runs at normal speed.** The clock is a readout of danger, not a
+punishment for standing still: with every hostile down and nothing queued behind
+them there is nothing to read and nothing to dodge, so crawling to the reward
+gun is only a wait. Queued spawns still count as occupied — a group walking in
+is the tensest beat the game has, and treating the gap between waves as empty
+would also open the clock on the first frame of every run, before the opening
+group has been placed.
 
 Everything simulated multiplies its delta by `timeScale` **except** the
 player's own movement and aim, which always run in real time. That asymmetry is

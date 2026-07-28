@@ -20,6 +20,8 @@ import {
     type DesignViewport,
     designViewportForSize,
     ENEMIES,
+    FIGURE_HEAD_RADIUS,
+    FIGURE_HEAD_Y,
     FIGURE_SCALE,
     figureScaleFor,
     TIME_STILL_THRESHOLD,
@@ -34,6 +36,11 @@ const BOIL_INTERVAL = 1 / 9;
 const HUD_FONT = 'Impact, Haettenschweiler, "Arial Narrow Bold", "Oswald", system-ui, sans-serif';
 const OUTLINE_DRAW_SECONDS = 0.55;
 const SMEAR_LIFETIME = 0.5;
+/** The soak bar above a hostile's head, in world units. */
+const SOAK_PIP_WIDTH = 6;
+const SOAK_PIP_HEIGHT = 3.4;
+const SOAK_PIP_SPACING = 2.4;
+const SOAK_PIP_GAP = 9;
 
 interface Speck {
     x: number;
@@ -757,9 +764,23 @@ export class GameScene {
                 scale,
             });
             if (enemy.maxSoak > 1) {
+                // Sit the bar above the head the renderer actually drew, not a
+                // fixed offset: a tank's head is scaled 1.22x and reaches y-45,
+                // so a hard-coded y-46 landed the pips on its skull. Deep pages
+                // also give every family extra soak, so the bar has to centre
+                // itself rather than grow off to one side.
+                const headTop = (FIGURE_HEAD_Y - FIGURE_HEAD_RADIUS) * scale;
+                const pipY = enemy.y + headTop - SOAK_PIP_GAP - SOAK_PIP_HEIGHT;
+                const span = enemy.maxSoak * SOAK_PIP_WIDTH + (enemy.maxSoak - 1) * SOAK_PIP_SPACING;
+                const startX = enemy.x - span / 2;
                 for (let pip = 0; pip < enemy.maxSoak; pip += 1) {
                     const filled = pip < enemy.soak;
-                    g.rect(enemy.x - 10 + pip * 8, enemy.y - 46, 6, 3.4).fill({
+                    g.rect(
+                        startX + pip * (SOAK_PIP_WIDTH + SOAK_PIP_SPACING),
+                        pipY,
+                        SOAK_PIP_WIDTH,
+                        SOAK_PIP_HEIGHT,
+                    ).fill({
                         color: this.palette.hostile,
                         alpha: filled ? 0.95 : 0.22,
                     });
