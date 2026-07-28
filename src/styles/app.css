@@ -581,6 +581,27 @@ body:not([data-pointer="coarse"]) .touch-controls {
 /* Short landscape phones: everything the thumb needs gets bigger, and the
    decorative parts of the HUD get out of the way. */
 @media (max-height: 460px) {
+    /* On a short phone the rail must stay a rail, not become a stack that is
+       taller than the content it sits under. */
+    .sheet-actions {
+        flex-wrap: nowrap;
+        gap: 8px;
+        margin-bottom: -16px;
+        padding: 8px 14px 10px;
+    }
+
+    .sheet-actions .ink-button {
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 8px 10px 9px;
+        font-size: clamp(11px, 1.5vmax, 14px);
+    }
+
+    .sheet {
+        gap: 6px;
+        padding: 12px 14px 14px;
+    }
+
     .hud-score-slot strong {
         font-size: clamp(22px, 7vmin, 34px);
     }
@@ -839,6 +860,30 @@ body:not([data-pointer="coarse"]) .touch-controls {
     letter-spacing: 0.16em;
     border: 2px solid var(--ink);
     border-radius: 10px 7px 11px 6px / 6px 11px 7px 10px;
+}
+
+/*
+ * The action rail. Everything a sheet can *do* lives here, pinned to the foot
+ * of the sheet rather than trailing the end of its content.
+ *
+ * A sticky BACK alone is not enough: on a short phone with host insets the
+ * sheet loses most of its height, and any primary action left in normal flow —
+ * CLAIM TODAY, RUN IT BACK, MAIN MENU — falls below the fold. The player is
+ * then asked to scroll a modal to find the only button that matters.
+ */
+.sheet-actions {
+    position: sticky;
+    bottom: -20px;
+    z-index: 2;
+    align-self: stretch;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin: 14px -22px -20px;
+    padding: 12px 20px 14px;
+    background: var(--page);
+    border-top: 3px solid var(--ink);
 }
 
 /* A back control that stays reachable however long the sheet gets. */

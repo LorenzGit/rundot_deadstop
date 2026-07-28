@@ -32,6 +32,24 @@ export interface ViewportSize {
 export const MAX_SAFE_AREA_FRACTION = 0.3;
 
 /**
+ * And the two edges of an axis together may not take more than this. Capping
+ * each edge separately still allows 60% of the screen to disappear, which is
+ * enough to squeeze a sheet down to a sliver and leave its buttons stacked in a
+ * rail taller than the content above them. Real insets are nowhere near this;
+ * a notch and a home indicator together are under 15% of an axis.
+ */
+export const MAX_SAFE_AREA_AXIS_FRACTION = 0.4;
+
+/** Shrinks a pair proportionally so the axis keeps most of itself. */
+function fitAxis(near: number, far: number, extent: number): [number, number] {
+    const total = Math.max(0, near) + Math.max(0, far);
+    const limit = Math.max(0, extent) * MAX_SAFE_AREA_AXIS_FRACTION;
+    if (total <= limit || total <= 0) return [near, far];
+    const scale = limit / total;
+    return [near > 0 ? near * scale : near, far > 0 ? far * scale : far];
+}
+
+/**
  * Bounded both ways, but not squashed to zero: a letterboxed frame legitimately
  * gets negative offsets so the HUD can reach back out toward the host boundary.
  * Only the magnitude is capped.
@@ -49,10 +67,15 @@ export function safeAreaOffsetsForFrame(
 ): EdgeInsets {
     const safeRight = viewport.width - Math.max(0, safeArea.right);
     const safeBottom = viewport.height - Math.max(0, safeArea.bottom);
-    return {
-        top: clampInset(Math.max(0, safeArea.top) - frame.top, viewport.height),
-        right: clampInset(frame.right - safeRight, viewport.width),
-        bottom: clampInset(frame.bottom - safeBottom, viewport.height),
-        left: clampInset(Math.max(0, safeArea.left) - frame.left, viewport.width),
-    };
+    const [top, bottom] = fitAxis(
+        clampInset(Math.max(0, safeArea.top) - frame.top, viewport.height),
+        clampInset(frame.bottom - safeBottom, viewport.height),
+        viewport.height,
+    );
+    const [left, right] = fitAxis(
+        clampInset(Math.max(0, safeArea.left) - frame.left, viewport.width),
+        clampInset(frame.right - safeRight, viewport.width),
+        viewport.width,
+    );
+    return { top, right, bottom, left };
 }

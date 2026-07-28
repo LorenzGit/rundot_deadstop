@@ -485,6 +485,38 @@ try {
     if (insetHud.time.top <= insetHud.score.bottom) {
         throw new Error("the TIME bar must stay below the score; insets must not invert the HUD");
     }
+    // Every sheet must keep its actions reachable without scrolling. A sticky
+    // BACK alone was not enough: CLAIM TODAY, RUN IT BACK and MAIN MENU sat in
+    // normal flow and fell below the fold once insets shrank the sheet.
+    const sheetChecks = [
+        ["daily", "window.__deadstopQa.openDailyRewards()", ["daily-claim", "daily-back"]],
+        ["kit", "window.__deadstopQa.openKit()", ["kit-back"]],
+        ["ledger", "window.__deadstopQa.openLedger()", ["ledger-back"]],
+        ["settings", "window.__deadstopQa.openSettings()", ["settings-back"]],
+        ["results", "window.__deadstopQa.forceResults()", ["retry-button", "menu-button"]],
+    ];
+    for (const [name, open, actionIds] of sheetChecks) {
+        await evaluate(open);
+        await delay(320);
+        const reach = await evaluate(`(() => {
+            const sheet = document.querySelector(".screen.active .sheet") || document.querySelector(".screen.active");
+            const bounds = sheet.getBoundingClientRect();
+            const hidden = [];
+            for (const id of ${JSON.stringify(actionIds)}) {
+                const el = document.getElementById(id);
+                if (!el) { hidden.push(id + ":missing"); continue; }
+                const r = el.getBoundingClientRect();
+                if (r.bottom > bounds.bottom + 1 || r.top < bounds.top - 1) hidden.push(id);
+                if (r.width < 1 || r.height < 1) hidden.push(id + ":collapsed");
+            }
+            return JSON.stringify({ hidden });
+        })()`).then(JSON.parse);
+        if (reach.hidden.length > 0) {
+            throw new Error(`${name}: actions unreachable without scrolling — ${reach.hidden.join(", ")}`);
+        }
+    }
+    console.log(`SHEET_ACTIONS reachable on every sheet at ${insetHud.w}x${insetHud.h} with host insets`);
+
     await capture(shot("phone-host-insets"));
     await command("Emulation.setTouchEmulationEnabled", { enabled: false });
 

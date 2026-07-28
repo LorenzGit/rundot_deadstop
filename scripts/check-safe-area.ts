@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { MAX_SAFE_AREA_FRACTION, safeAreaOffsetsForFrame } from "../src/sdk/safeArea.ts";
+import { MAX_SAFE_AREA_AXIS_FRACTION, MAX_SAFE_AREA_FRACTION, safeAreaOffsetsForFrame } from "../src/sdk/safeArea.ts";
 
 assert.deepEqual(
     safeAreaOffsetsForFrame(
@@ -69,4 +69,22 @@ assert.deepEqual(
     "a non-finite safe area must fall back to nothing rather than NaN padding",
 );
 
-console.log("safe area check ok: signed frame offsets, bounded against hostile host readings");
+// Capping each edge alone still lets 60% of an axis vanish, which squeezes a
+// sheet to a sliver. The two edges of an axis together are bounded as well.
+{
+    const squeezed = safeAreaOffsetsForFrame(
+        { top: 228, right: 750, bottom: 1182, left: 741 },
+        { top: 0, right: 718, bottom: 440, left: 0, width: 718, height: 440 },
+        { width: 718, height: 440 },
+    );
+    assert.ok(
+        squeezed.top + squeezed.bottom <= 440 * MAX_SAFE_AREA_AXIS_FRACTION + 0.001,
+        `vertical insets took ${squeezed.top + squeezed.bottom} of 440; a sheet needs most of its axis`,
+    );
+    assert.ok(
+        squeezed.left + squeezed.right <= 718 * MAX_SAFE_AREA_AXIS_FRACTION + 0.001,
+        `horizontal insets took ${squeezed.left + squeezed.right} of 718`,
+    );
+}
+
+console.log("safe area check ok: signed frame offsets, per-edge and per-axis bounds");
