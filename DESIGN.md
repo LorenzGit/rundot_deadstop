@@ -51,8 +51,15 @@ would also open the clock on the first frame of every run, before the opening
 group has been placed.
 
 Everything simulated multiplies its delta by `timeScale` **except** the
-player's own movement and aim, which always run in real time. That asymmetry is
-the contract; nothing may violate it.
+player's own movement, aim, and **rate of fire**, which always run in real time.
+That asymmetry is the contract; nothing may violate it.
+
+The trigger belongs on the player's side of that line. Draining the weapon
+cooldown on the world clock throttled the rate of fire by exactly the factor the
+world was slowed, so standing still — the game's entire reading stance — cost
+`4.83s` between rifle shots, `9.00s` between shotgun shells, and `21.62s`
+between launcher rounds. Each shot still pulses the clock, so sustained fire
+moves the page and the trade is preserved; only the punishment is gone.
 
 Reduced motion does not change the clock — it only removes decorative shake,
 boil, and particle churn.

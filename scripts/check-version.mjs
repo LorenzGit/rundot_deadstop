@@ -59,6 +59,19 @@ assert.ok(Array.isArray(gameConfig.keywords) && gameConfig.keywords.length >= 3,
 
 assert.match(config, /TIME_FLOOR = 0\.0\d+/, "the page must never freeze completely");
 assert.match(core, /this\.movePlayer\(realDelta\)/, "player movement must run on real time, never on the scaled clock");
+// The trigger is the player's act too. Draining its cooldown on the world clock
+// throttled the rate of fire by the same factor the world was slowed: 9 real
+// seconds between shotgun shells while standing still, 21 for a launcher.
+assert.match(
+    core,
+    /this\.player\.cooldown = Math\.max\(0, this\.player\.cooldown - realDelta\);/,
+    "the player's rate of fire must run on real time, never on the scaled clock",
+);
+assert.match(
+    core,
+    /private updatePlayerWeapon\(realDelta: number\): void \{/,
+    "the weapon update must be handed real seconds, not world seconds",
+);
 assert.match(
     core,
     /const worldDelta = realDelta \* this\.timeScale/,

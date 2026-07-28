@@ -383,7 +383,7 @@ export class GameCore {
 
         this.movePlayer(realDelta);
         this.updateStillness(worldDelta);
-        this.updatePlayerWeapon(worldDelta);
+        this.updatePlayerWeapon(realDelta);
         if (this.isDefeated()) return;
 
         this.updateBullets(worldDelta);
@@ -547,13 +547,20 @@ export class GameCore {
         return { x: toX, y: toY };
     }
 
-    private updatePlayerWeapon(worldDelta: number): void {
+    private updatePlayerWeapon(realDelta: number): void {
         if (!this.player.alive) {
             this.swapRequested = false;
             this.dryTriggerHeld = false;
             return;
         }
-        this.player.cooldown = Math.max(0, this.player.cooldown - worldDelta);
+        // Real time, like the player's movement and aim. Draining the trigger
+        // on the world clock meant standing still — the game's whole reading
+        // stance — throttled the rate of fire by the same 22x the world was
+        // slowed: 9 real seconds between shotgun shells, 21 for a launcher.
+        // Pulling the trigger is the player's own act, so it runs at their
+        // speed; each shot still pulses the clock, so sustained fire moves the
+        // world and the trade is preserved.
+        this.player.cooldown = Math.max(0, this.player.cooldown - realDelta);
 
         // Letting go of the trigger is what arms the throw. Holding it down is
         // one continuous act of shooting, so the round that empties the gun

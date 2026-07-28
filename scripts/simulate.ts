@@ -32,6 +32,7 @@ import {
     rewardForLevel,
     STYLE_HEADSHOT,
     TIME_FLOOR,
+    WEAPON_IDS,
     WEAPONS,
     WORLD_HEIGHT,
     WORLD_WIDTH,
@@ -307,6 +308,98 @@ assert.ok(
     walked > PLAYER_SPEED * 0.5 * 0.5,
     `player movement must run in real time regardless of the clock (moved ${walked.toFixed(1)})`,
 );
+
+/* ------------------------ 2a2. the trigger runs at the player's own speed */
+
+// Pulling the trigger is the player's act, like moving and aiming, so it must
+// not inherit the world clock. Draining the cooldown on world time throttled
+// the rate of fire by the same factor the world was slowed — 9 real seconds
+// between shotgun shells while standing still, 21 for a launcher.
+for (const id of WEAPON_IDS) {
+    const core = new GameCore();
+    core.reset(0x00c0_ffee);
+    core.forceWeapon(id, 9);
+    const shots: number[] = [];
+    for (let frame = 0; frame < 60 * 40 && shots.length < 2; frame += 1) {
+        const player = core.snapshot().player;
+        // Perfectly still: the clock sits at its floor the whole time.
+        core.setInput({ moveX: 0, moveY: 0, aimX: player.x + 400, aimY: player.y, firing: true });
+        core.update(STEP);
+        for (const event of core.drainEvents()) if (event.type === "shot") shots.push(frame * STEP);
+    }
+    assert.equal(shots.length, 2, `${id} must be able to fire twice while standing still`);
+    const gap = (shots[1] ?? 0) - (shots[0] ?? 0);
+    assert.ok(
+        gap <= WEAPONS[id].interval + 0.05,
+        `${id} took ${gap.toFixed(2)}s between shots while still; its interval is ${WEAPONS[id].interval.toFixed(2)}s`,
+    );
+}
+
+// Sustained fire still costs clock: every shot pulses it, so the page moves.
+{
+    const core = new GameCore();
+    core.reset(0x00c0_ffee);
+    core.forceWeapon("smg", 26);
+    let peak = 0;
+    for (let frame = 0; frame < 120; frame += 1) {
+        const player = core.snapshot().player;
+        core.setInput({ moveX: 0, moveY: 0, aimX: player.x + 400, aimY: player.y, firing: true });
+        core.update(STEP);
+        peak = Math.max(peak, core.snapshot().timeScale);
+    }
+    assert.ok(peak > 0.9, `holding the trigger must still open the clock (saw ${peak.toFixed(3)})`);
+}
+
+/* --------------------------------------- 2b. a clear page runs at full speed */
+
+// The clock reads danger. A page with hostiles on or inbound to it still holds
+// at the floor; a genuinely clear one runs normally so the walk to the reward
+// gun is not a crawl.
+{
+    const occupied = new GameCore();
+    occupied.reset(0x0c1e_a700);
+    for (let frame = 0; frame < 120; frame += 1) {
+        const player = occupied.snapshot().player;
+        occupied.setInput({ moveX: 0, moveY: 0, aimX: player.x + 1, aimY: player.y, firing: false });
+        occupied.update(STEP);
+    }
+    const held = occupied.snapshot();
+    assert.ok(held.enemies.length + held.pendingSpawns > 0, "this check needs hostiles on or inbound to the page");
+    assert.ok(
+        held.timeScale <= TIME_FLOOR + 0.02,
+        `a held page with hostiles must stay at the floor (saw ${held.timeScale.toFixed(3)})`,
+    );
+}
+
+{
+    const emptied = new GameCore();
+    emptied.reset(0x0c1e_a701);
+    for (let frame = 0; frame < 60 * 90; frame += 1) {
+        const snapshot = emptied.snapshot();
+        if (snapshot.enemies.length + snapshot.pendingSpawns === 0) break;
+        if (!snapshot.player.alive) break;
+        const target = snapshot.enemies[0];
+        emptied.setInput({
+            moveX: 0,
+            moveY: 0,
+            aimX: target ? target.x : snapshot.player.x + 1,
+            aimY: target ? target.y : snapshot.player.y,
+            firing: Boolean(target),
+        });
+        emptied.update(STEP);
+    }
+    const cleared = emptied.snapshot();
+    assert.equal(cleared.enemies.length + cleared.pendingSpawns, 0, "the page must actually be cleared for this check");
+    for (let frame = 0; frame < 90; frame += 1) {
+        const player = emptied.snapshot().player;
+        emptied.setInput({ moveX: 0, moveY: 0, aimX: player.x + 1, aimY: player.y, firing: false });
+        emptied.update(STEP);
+    }
+    assert.ok(
+        emptied.snapshot().timeScale > 0.9,
+        `a clear page must run normally even standing still (saw ${emptied.snapshot().timeScale.toFixed(3)})`,
+    );
+}
 
 /* ----------------------------------------------------- 3. a fought-out run */
 
