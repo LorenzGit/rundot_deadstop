@@ -1149,11 +1149,21 @@ body:not([data-pointer="coarse"]) .touch-controls {
     font-size: clamp(15px, 2.4vmin, 24px);
 }
 
+/* The results rail stacks: the offer on its own line, then the two ways out. */
 .results-actions {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.results-buttons {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     gap: 10px;
+}
+
+.results-actions .inline-offer {
+    width: 100%;
 }
 
 /* ------------------------------------------------------------- diagnostics */
@@ -1426,8 +1436,8 @@ html[data-reduced-motion="true"] .screen.active {
     .sheet {
         --sheet-pad-x: 14px;
         --sheet-pad-b: 14px;
-        gap: 6px;
-        padding-top: 12px;
+        gap: 4px;
+        padding-top: 8px;
     }
 
     .hud-score-slot strong {
@@ -1468,6 +1478,75 @@ html[data-reduced-motion="true"] .screen.active {
 
     .draft-card {
         padding: 12px 10px 14px;
+    }
+
+    /*
+     * The results sheet is the most-seen modal and its content is fixed, so it
+     * should fit rather than scroll. Measured on a phone inside the host, the
+     * default layout needs ~304px of a 189px body — and the block that fell off
+     * the end was the Second Wind offer, the one thing on the screen a player
+     * might act on. Everything here buys that space back.
+     */
+    .results-score {
+        font-size: clamp(30px, 7vmin, 52px);
+    }
+
+    /* Seven stats in two rows rather than three: the sheet is wide and short,
+       so the space to spend is horizontal. */
+    .results-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 3px 8px;
+        padding: 4px 0;
+        width: 100%;
+    }
+
+    /* Label beside value rather than above it: each cell is one line instead
+       of two, which is the difference between the last row fitting and being
+       sliced in half. */
+    .results-grid div {
+        flex-direction: row;
+        align-items: baseline;
+        justify-content: center;
+        gap: 5px;
+    }
+
+    .results-score {
+        font-size: clamp(24px, 6vmin, 44px);
+    }
+
+    .results-grid strong {
+        font-size: clamp(13px, 2vmin, 18px);
+    }
+
+    .results-grid span {
+        font-size: clamp(7px, 1vmin, 9px);
+        letter-spacing: 0.12em;
+    }
+
+    .inline-offer {
+        gap: 8px;
+        padding: 5px 10px;
+    }
+
+    .results-buttons {
+        flex-wrap: nowrap;
+        gap: 8px;
+    }
+
+    .results-buttons .ink-button {
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 7px 10px 8px;
+        font-size: clamp(11px, 1.5vmax, 14px);
+    }
+
+    .inline-offer small {
+        display: none;
+    }
+
+    /* The rail sits directly beneath; the reminder is not worth a line here. */
+    #results-break-note {
+        display: none;
     }
 
     .draft-card small {

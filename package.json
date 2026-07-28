@@ -1,6 +1,6 @@
 {
   "name": "deadstop",
-  "version": "0.15.1",
+  "version": "0.15.2",
   "description": "An ink-on-paper stick-figure roguelike gunfight where time only moves when you do.",
   "private": true,
   "type": "module",

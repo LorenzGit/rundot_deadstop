@@ -493,10 +493,16 @@ try {
         ["kit", "window.__deadstopQa.openKit()", ["kit-back"]],
         ["ledger", "window.__deadstopQa.openLedger()", ["ledger-back"]],
         ["settings", "window.__deadstopQa.openSettings()", ["settings-back"]],
-        ["results", "window.__deadstopQa.forceResults()", ["retry-button", "menu-button"]],
+        ["results", "window.__deadstopQa.forceResults()", ["retry-button", "menu-button", "second-wind-button"]],
     ];
     for (const [name, open, actionIds] of sheetChecks) {
         await evaluate(open);
+        // With no host the Second Wind offer hides itself, so QA never saw the
+        // one block that was being clipped on a real device. Force it visible.
+        await evaluate(`(() => {
+            const offer = document.getElementById("second-wind-offer");
+            if (offer) offer.classList.remove("hidden");
+        })()`);
         await delay(320);
         const reach = await evaluate(`(() => {
             const sheet = document.querySelector(".screen.active .sheet") || document.querySelector(".screen.active");
@@ -516,6 +522,21 @@ try {
         }
     }
     console.log(`SHEET_ACTIONS reachable on every sheet at ${insetHud.w}x${insetHud.h} with host insets`);
+
+    // The results sheet is the most-seen modal and its content is fixed, so at
+    // a phone size it should fit outright rather than hide stats behind the
+    // rail. A few pixels of slack absorbs font rounding.
+    await evaluate("window.__deadstopQa.forceResults()");
+    await evaluate(`(() => { document.getElementById("second-wind-offer").classList.remove("hidden"); })()`);
+    await delay(320);
+    const resultsFit = await evaluate(`(() => {
+        const sheet = document.querySelector("#results-screen .sheet");
+        return JSON.stringify({ overflow: sheet.scrollHeight - sheet.clientHeight });
+    })()`).then(JSON.parse);
+    console.log(`RESULTS_FIT ${JSON.stringify(resultsFit)}`);
+    if (resultsFit.overflow > 16) {
+        throw new Error(`the results sheet overflows by ${resultsFit.overflow}px; stats hide behind the rail`);
+    }
 
     // The draft always deals exactly three cards. Any layout that fits two but
     // not three orphans the last one in a half-empty row, which is what

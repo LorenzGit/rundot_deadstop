@@ -413,19 +413,26 @@
                         <div><span>PERSONAL BEST</span><strong id="results-best">0</strong></div>
                     </div>
 
-                    <article id="second-wind-offer" class="inline-offer hidden">
-                        <div>
-                            <strong>SECOND WIND</strong>
-                            <small id="second-wind-status">CHECKING VIDEO…</small>
-                        </div>
-                        <button id="second-wind-button" class="ink-button" type="button">WATCH · REVIVE</button>
-                    </article>
-
                     <p id="results-break-note" class="sheet-note quiet"></p>
 
+                    <!--
+                        The offer is an action, so it lives in the rail with the
+                        others. Left in the scrolling body it was the one block
+                        that fell off the end — the only thing on this screen a
+                        player might actually act on.
+                    -->
                     <div class="sheet-actions results-actions">
-                        <button id="retry-button" class="ink-button primary-button" type="button">RUN IT BACK</button>
-                        <button id="menu-button" class="ink-button" type="button">MAIN MENU</button>
+                        <article id="second-wind-offer" class="inline-offer hidden">
+                            <div>
+                                <strong>SECOND WIND</strong>
+                                <small id="second-wind-status">CHECKING VIDEO…</small>
+                            </div>
+                            <button id="second-wind-button" class="ink-button" type="button">WATCH · REVIVE</button>
+                        </article>
+                        <div class="results-buttons">
+                            <button id="retry-button" class="ink-button primary-button" type="button">RUN IT BACK</button>
+                            <button id="menu-button" class="ink-button" type="button">MAIN MENU</button>
+                        </div>
                     </div>
                     </div>
                 </section>
