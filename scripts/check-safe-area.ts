@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { safeAreaOffsetsForFrame } from "../src/sdk/safeArea.ts";
+import { MAX_SAFE_AREA_FRACTION, safeAreaOffsetsForFrame } from "../src/sdk/safeArea.ts";
 
 assert.deepEqual(
     safeAreaOffsetsForFrame(
@@ -31,4 +31,42 @@ assert.deepEqual(
     "only the safe-area overlap with the game frame must become local HUD padding",
 );
 
-console.log("safe area check ok: viewport boundaries converted to signed frame offsets");
+// A host reporting device pixels against our CSS-pixel frame produced insets
+// that ate the screen: the HUD anchors to them, so the TIME bar ended up above
+// the score and the movement stick was thrown clean off the top.
+{
+    const hostile = safeAreaOffsetsForFrame(
+        { top: 228, right: 750, bottom: 1182, left: 741 },
+        { top: 0, right: 718, bottom: 440, left: 0, width: 718, height: 440 },
+        { width: 718, height: 440 },
+    );
+    for (const [edge, value, extent] of [
+        ["top", hostile.top, 440],
+        ["bottom", hostile.bottom, 440],
+        ["left", hostile.left, 718],
+        ["right", hostile.right, 718],
+    ] as const) {
+        assert.ok(
+            Math.abs(value) <= extent * MAX_SAFE_AREA_FRACTION + 0.001,
+            `${edge} inset ${value} must be capped; an inset that eats the screen is a bad reading`,
+        );
+    }
+    assert.ok(
+        hostile.top + hostile.bottom < 440,
+        "vertical insets must never consume the whole viewport, or nothing can be laid out",
+    );
+    assert.ok(hostile.left + hostile.right < 718, "horizontal insets must never consume the whole viewport");
+}
+
+// Non-finite readings must not poison the layout.
+assert.deepEqual(
+    safeAreaOffsetsForFrame(
+        { top: Number.NaN, right: Number.POSITIVE_INFINITY, bottom: Number.NaN, left: Number.NaN },
+        { top: 0, right: 390, bottom: 844, left: 0, width: 390, height: 844 },
+        { width: 390, height: 844 },
+    ),
+    { top: 0, right: 0, bottom: 0, left: 0 },
+    "a non-finite safe area must fall back to nothing rather than NaN padding",
+);
+
+console.log("safe area check ok: signed frame offsets, bounded against hostile host readings");

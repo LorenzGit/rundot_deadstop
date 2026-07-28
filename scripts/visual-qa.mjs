@@ -424,6 +424,70 @@ try {
     await capture(shot("landscape-touch-stick"));
     await command("Emulation.setTouchEmulationEnabled", { enabled: false });
 
+    // A short phone inside the RUN host, with real safe-area insets applied.
+    // Nothing here ran with insets before, which is exactly how a HUD that
+    // anchors to them shipped with the TIME bar above the score and the
+    // movement stick off the top of the screen.
+    await command("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+    await openGame(718, 440);
+    await evaluate(`(async () => {
+        const area = await import("/src/sdk/safeArea.ts");
+        const qa = window.__deadstopQa;
+        qa.startRun();
+        document.getElementById("tap-tutorial").classList.remove("visible");
+        document.getElementById("touch-controls-mode").value = "on";
+        document.getElementById("touch-controls-mode").dispatchEvent(new Event("change", { bubbles: true }));
+        // Drive the real conversion with a host reporting device pixels against
+        // our CSS-pixel frame — the shape that broke it on a real handset.
+        const insets = area.safeAreaOffsetsForFrame(
+            { top: 228, right: 750, bottom: 1182, left: 741 },
+            { top: 0, right: 718, bottom: 440, left: 0, width: 718, height: 440 },
+            { width: 718, height: 440 },
+        );
+        const root = document.documentElement.style;
+        root.setProperty("--run-safe-top", insets.top + "px");
+        root.setProperty("--run-safe-right", insets.right + "px");
+        root.setProperty("--run-safe-bottom", insets.bottom + "px");
+        root.setProperty("--run-safe-left", insets.left + "px");
+    })()`);
+    await delay(400);
+
+    const insetHud = await evaluate(`(() => {
+        const box = (id) => {
+            const el = document.getElementById(id);
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            return { top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left) };
+        };
+        return JSON.stringify({
+            h: window.innerHeight,
+            w: window.innerWidth,
+            score: box("score-text"),
+            time: box("time-fill"),
+            stick: box("stick-base"),
+            docScrolls: document.documentElement.scrollHeight > window.innerHeight + 1,
+        });
+    })()`).then(JSON.parse);
+    console.log(`INSET_HUD ${JSON.stringify(insetHud)}`);
+    if (insetHud.docScrolls) throw new Error("the document must never scroll; the game is a fixed frame");
+    for (const [name, box] of [
+        ["score", insetHud.score],
+        ["TIME bar", insetHud.time],
+        ["move stick", insetHud.stick],
+    ]) {
+        if (!box) throw new Error(`${name} is missing from the HUD`);
+        if (box.top < 0 || box.bottom > insetHud.h) {
+            throw new Error(
+                `${name} is off screen with host insets applied (${box.top}..${box.bottom} of ${insetHud.h})`,
+            );
+        }
+    }
+    if (insetHud.time.top <= insetHud.score.bottom) {
+        throw new Error("the TIME bar must stay below the score; insets must not invert the HUD");
+    }
+    await capture(shot("phone-host-insets"));
+    await command("Emulation.setTouchEmulationEnabled", { enabled: false });
+
     // Portrait shows the honest rotate nudge rather than a squashed arena.
     await openGame(390, 844);
     await capture(shot("portrait-rotate-nudge"));

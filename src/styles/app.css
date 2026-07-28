@@ -66,9 +66,21 @@ body {
 #app {
     position: fixed;
     inset: 0;
+    overflow: hidden;
     display: grid;
     place-items: center;
     background: var(--page);
+}
+
+/* Dynamic viewport units track the box the player can actually see as host
+   chrome slides in and out. Without this the layout box can be taller than the
+   visible one, and a HUD measured against it hangs off the bottom of a phone. */
+@supports (height: 100dvh) {
+    html,
+    body,
+    #app {
+        height: 100dvh;
+    }
 }
 
 #app-frame {

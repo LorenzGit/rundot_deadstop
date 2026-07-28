@@ -122,9 +122,13 @@ export function applyRunSafeArea(): void {
     }
     const frame = document.getElementById("app-frame");
     if (frame) {
+        // The *visible* box, not the layout box. Inside a host webview the two
+        // differ, and measuring the frame against the larger one turns a small
+        // real inset into one that eats most of the screen.
+        const visual = window.visualViewport;
         safeArea = safeAreaOffsetsForFrame(safeArea, frame.getBoundingClientRect(), {
-            width: window.innerWidth,
-            height: window.innerHeight,
+            width: visual?.width ?? window.innerWidth,
+            height: visual?.height ?? window.innerHeight,
         });
     }
     const root = document.documentElement;
@@ -138,14 +142,15 @@ export function bindRunSafeArea(): void {
     applyRunSafeArea();
     if (safeAreaResizeBound) return;
     safeAreaResizeBound = true;
-    window.addEventListener(
-        "resize",
-        () => {
-            window.cancelAnimationFrame(safeAreaFrame);
-            safeAreaFrame = window.requestAnimationFrame(applyRunSafeArea);
-        },
-        { passive: true },
-    );
+    const schedule = (): void => {
+        window.cancelAnimationFrame(safeAreaFrame);
+        safeAreaFrame = window.requestAnimationFrame(applyRunSafeArea);
+    };
+    window.addEventListener("resize", schedule, { passive: true });
+    window.addEventListener("orientationchange", schedule, { passive: true });
+    // A host toolbar sliding away changes the visible box without a resize.
+    window.visualViewport?.addEventListener("resize", schedule, { passive: true });
+    window.visualViewport?.addEventListener("scroll", schedule, { passive: true });
 }
 
 export async function readAppStorage(key: string): Promise<{ ok: boolean; value: string | null }> {
