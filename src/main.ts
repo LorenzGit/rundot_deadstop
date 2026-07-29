@@ -144,16 +144,27 @@ function startRun(): void {
     // The kit is bought at the moment the run starts, never before.
     const saved = saveSystem.get();
     const kit: BoosterId[] = [];
+    const unpaid: BoosterId[] = [];
     let spent = 0;
     for (const id of saved.kit.slice(0, KIT_SLOTS)) {
         const cost = BOOSTERS[id].inkCost ?? 0;
-        if (!saveSystem.spendInk(cost)) continue;
+        if (!saveSystem.spendInk(cost)) {
+            unpaid.push(id);
+            continue;
+        }
         spent += cost;
         kit.push(id);
     }
     if (spent > 0) {
         void saveSystem.flush();
         recordAnalytics("kit_spent", { ink: spent, boosters: kit });
+    }
+    // Starting a run short of what was packed used to happen in silence, which
+    // reads as the kit having been lost rather than unpaid for.
+    if (unpaid.length > 0) {
+        const names = unpaid.map((id) => BOOSTERS[id].name).join(" + ");
+        ui.toast(`NOT ENOUGH INK · ${names} LEFT BEHIND`);
+        recordAnalytics("kit_unaffordable", { boosters: unpaid, ink: saveSystem.get().wallet.ink });
     }
 
     const seed = (0x1f3a7c55 + saved.records.totalRuns * 7919 + runKey * 104_729) >>> 0;

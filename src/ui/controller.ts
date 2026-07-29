@@ -624,9 +624,7 @@ export class UiController {
         grid.replaceChildren();
         let total = 0;
         for (const id of saved.kit) total += BOOSTERS[id].inkCost ?? 0;
-        element("kit-summary").textContent = saved.kit.length
-            ? `${saved.kit.map((id) => BOOSTERS[id].name).join(" + ")} · ${total} INK ON START`
-            : "NOTHING PACKED · 0 INK";
+        this.renderKitLedger(saved.kit, total, saved.wallet.ink);
 
         for (const id of KIT_BOOSTER_IDS) {
             const definition = BOOSTERS[id];
@@ -653,6 +651,37 @@ export class UiController {
 
         this.renderInkCases();
         this.refreshMeta();
+    }
+
+    /**
+     * Spells the rental out in balances rather than a single price. A player
+     * reading "90 INK" on a card has no way to tell that the charge repeats, so
+     * the ledger answers the two questions that follow from it: what is left
+     * after the next run, and how many runs the balance actually covers.
+     */
+    private renderKitLedger(kit: readonly BoosterId[], cost: number, ink: number): void {
+        const packed = element("kit-ledger-packed");
+        const costCell = element("kit-ledger-cost");
+        const after = element("kit-ledger-after");
+        const runs = element("kit-ledger-runs");
+
+        packed.textContent = kit.length ? kit.map((id) => BOOSTERS[id].name).join(" + ") : "Nothing";
+        costCell.textContent = `${cost} INK`;
+
+        if (cost <= 0) {
+            // An empty kit is free forever, so a countdown would be noise.
+            after.textContent = `${ink} INK · unchanged`;
+            runs.textContent = "Unlimited — an empty kit is free";
+            for (const cell of [after, runs]) cell.classList.remove("short");
+            return;
+        }
+
+        const affordable = Math.floor(ink / cost);
+        after.textContent = ink >= cost ? `${ink - cost} INK` : `${ink} INK · not enough`;
+        runs.textContent =
+            affordable > 0 ? `${affordable} at this balance` : `Short ${cost - ink} INK for the next run`;
+        // Warn on the run that cannot be paid for, not merely a low balance.
+        for (const cell of [after, runs]) cell.classList.toggle("short", ink < cost);
     }
 
     private renderInkCases(): void {

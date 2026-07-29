@@ -997,6 +997,55 @@ body:not([data-pointer="coarse"]) .touch-controls {
     opacity: 0.8;
 }
 
+/* The rental made legible: one row per question a repeating charge raises.
+   Labels left, figures right, so the balance column reads as a column. */
+.kit-ledger {
+    /* Two columns wherever there is room: four stacked rows pushed the booster
+       grid off a short landscape screen. */
+    display: grid;
+    /* min() so the track collapses to one column on a narrow sheet instead of
+       overflowing. 280px keeps it to a square 2x2 rather than a lopsided 3+1. */
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+    /* The gaps are the rules: the container colour shows through them, so the
+       grid stays correctly ruled at any column count without a per-row border
+       that cannot know which row it landed on. */
+    gap: 1px;
+    width: min(100%, 720px);
+    margin: 0;
+    padding: 0;
+    border: 2px solid var(--ink);
+    background: var(--ghost);
+    box-shadow: 2px 3px 0 var(--ink);
+}
+
+.kit-ledger > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 5px 10px 6px;
+    background: var(--page-shade);
+}
+
+.kit-ledger dt {
+    font: 400 clamp(10px, 1.4vmin, 12px) / 1.3 var(--body);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ghost);
+}
+
+.kit-ledger dd {
+    margin: 0;
+    font: 700 clamp(11px, 1.6vmin, 14px) / 1.3 var(--body);
+    text-align: right;
+    color: var(--ink);
+}
+
+/* Only for a run the balance cannot actually pay for. */
+.kit-ledger dd.short {
+    color: var(--hostile);
+}
+
 .kit-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));

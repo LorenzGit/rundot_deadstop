@@ -457,11 +457,22 @@
                             <span class="wallet-chip">INK <strong id="kit-wallet">0</strong></span>
                         </header>
                         <p class="sheet-note">
-                            Carry up to two boosters into the next run. Ink is earned by playing; every booster here
-                            is also drafted for free between levels.
+                            Pack up to two boosters to start the next run holding them. Their ink is spent every
+                            time a run begins &mdash; packing hires a booster for one run, it never unlocks it.
                         </p>
-                        <p id="kit-summary" class="sheet-note quiet">NOTHING PACKED · 0 INK</p>
+                        <dl id="kit-ledger" class="kit-ledger">
+                            <div><dt>Packed</dt><dd id="kit-ledger-packed">Nothing</dd></div>
+                            <div><dt>Each run costs</dt><dd id="kit-ledger-cost">0 INK</dd></div>
+                            <div><dt>Left after the next run</dt><dd id="kit-ledger-after">0 INK</dd></div>
+                            <div><dt>Runs you can cover</dt><dd id="kit-ledger-runs">&infin;</dd></div>
+                        </dl>
                         <div id="kit-grid" class="kit-grid"></div>
+                        <p class="sheet-note quiet">
+                            Ink comes in three ways: 1 ink for every 250 points when a run ends, 60&ndash;400 a day
+                            from the daily reward (1,190 across a full week), or an Ink Case below. Every booster
+                            here is also offered free in the draft between levels &mdash; packing one only
+                            guarantees you begin the run with it.
+                        </p>
                         <div id="ink-case-grid" class="offer-grid"></div>
                         <button id="kit-back" class="ink-button sticky-back" type="button">BACK</button>
                     </div>

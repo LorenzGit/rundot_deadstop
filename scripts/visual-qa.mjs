@@ -186,6 +186,72 @@ try {
     const kitCards = await evaluate("document.querySelectorAll('.kit-card').length");
     if (kitCards < 8) throw new Error(`The kit rendered only ${kitCards} boosters`);
 
+    // The kit charges its price on every run, so the page has to answer what is
+    // left afterwards. Assert the arithmetic, not just that text rendered.
+    const ledger = JSON.parse(
+        await evaluate(`JSON.stringify({
+            wallet: Number(document.getElementById("kit-wallet").textContent),
+            cost: parseInt(document.getElementById("kit-ledger-cost").textContent, 10),
+            after: parseInt(document.getElementById("kit-ledger-after").textContent, 10),
+            runs: parseInt(document.getElementById("kit-ledger-runs").textContent, 10),
+            packed: document.getElementById("kit-ledger-packed").textContent,
+            rows: document.querySelectorAll("#kit-ledger > div").length,
+        })`),
+    );
+    console.log("KIT_LEDGER", JSON.stringify(ledger));
+    if (ledger.rows !== 4) throw new Error(`The kit ledger lost a row (${ledger.rows})`);
+    if (ledger.cost <= 0) throw new Error("The QA save packs a booster, so the kit must cost ink");
+    if (ledger.after !== ledger.wallet - ledger.cost) {
+        throw new Error(`Ledger balance is wrong: ${ledger.wallet} - ${ledger.cost} != ${ledger.after}`);
+    }
+    if (ledger.runs !== Math.floor(ledger.wallet / ledger.cost)) {
+        throw new Error(`Ledger run count is wrong: saw ${ledger.runs}`);
+    }
+    // The ledger explains the rental, it must not crowd out the thing it
+    // explains. Measured as a share of the sheet: the four rows stacked in one
+    // column took a third of a short landscape sheet, two columns take a sixth.
+    const kitFit = JSON.parse(
+        await evaluate(`(() => {
+            const ledger = document.getElementById("kit-ledger").getBoundingClientRect();
+            const sheet = document.querySelector("#kit-screen .sheet").getBoundingClientRect();
+            const cards = [...document.querySelectorAll(".kit-card")];
+            const visible = cards.filter((c) => c.getBoundingClientRect().bottom <= sheet.bottom).length;
+            return JSON.stringify({
+                share: Math.round((ledger.height / sheet.height) * 100),
+                ledgerHeight: Math.round(ledger.height),
+                visibleCards: visible,
+            });
+        })()`),
+    );
+    console.log("KIT_FIT", JSON.stringify(kitFit));
+    if (kitFit.share > 25) throw new Error(`The kit ledger eats ${kitFit.share}% of the sheet`);
+    if (kitFit.visibleCards < 4) throw new Error(`Only ${kitFit.visibleCards} boosters fit under the ledger`);
+
+    // The warning the page exists for. A healthy QA wallet never reaches it, so
+    // reseed a broke one rather than trusting a state nothing here can enter.
+    const brokeSave = { ...qaSave, wallet: { ink: 30 }, kit: ["quick_feet"] };
+    await evaluate(
+        `localStorage.setItem("deadstop.local-save", ${JSON.stringify(JSON.stringify(brokeSave))}); location.reload();`,
+    );
+    await waitFor("document.readyState === 'complete'", "broke document");
+    await waitFor("Boolean(window.__deadstopQa)", "broke QA bridge");
+    await evaluate("window.__deadstopQa.openKit()");
+    const broke = JSON.parse(
+        await evaluate(`JSON.stringify({
+            after: document.getElementById("kit-ledger-after").textContent,
+            runs: document.getElementById("kit-ledger-runs").textContent,
+            flagged: document.querySelectorAll("#kit-ledger dd.short").length,
+        })`),
+    );
+    console.log("KIT_SHORT", JSON.stringify(broke));
+    if (broke.flagged !== 2) throw new Error(`An unaffordable kit must be flagged, saw ${broke.flagged}`);
+    if (!broke.runs.includes("70")) throw new Error(`The shortfall must be named, saw "${broke.runs}"`);
+    await capture(shot("landscape-kit-short"));
+    await evaluate(
+        `localStorage.setItem("deadstop.local-save", ${JSON.stringify(JSON.stringify(qaSave))}); location.reload();`,
+    );
+    await waitFor("Boolean(window.__deadstopQa)", "restored QA bridge");
+
     await evaluate("window.__deadstopQa.openLedger()");
     await capture(shot("landscape-ledger"));
 
