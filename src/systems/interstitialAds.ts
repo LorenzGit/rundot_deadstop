@@ -7,6 +7,7 @@ import { getMonetizationRuntime } from "./monetization/runtime.ts";
 import { saveSystem } from "./save.ts";
 import { serverNow, trustedTimeGate } from "./serverTime.ts";
 
+import { analytics } from "./analytics/analyticsConfig.ts";
 const RESULTS_PLACEMENT_ID = "interstitial_results_break";
 const NO_INTERSTITIALS_ENTITLEMENT = "deadstop_no_interstitials";
 const registeredPlacement = monetizationPlacements.require(RESULTS_PLACEMENT_ID);
@@ -166,6 +167,9 @@ export async function maybeShowResultsInterstitial(
         result: displayed ? "displayed" : "unavailable_or_suppressed",
     });
     if (!displayed) return { displayed: false, reason: "no-fill" };
+    // Portfolio-standard name alongside the game's own, so interstitial load
+    // compares across titles — the number to watch against D1 when tuning.
+    analytics.event("interstitial_shown", { ad_display_id: RESULTS_PLACEMENT_ID });
 
     const day = trustedTimeGate().day;
     if (day) {

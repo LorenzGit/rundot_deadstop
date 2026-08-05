@@ -21,6 +21,7 @@ import {
     requestHostExit,
     triggerHaptic,
 } from "./sdk/runSdk.ts";
+import { analytics } from "./systems/analytics/analyticsConfig.ts";
 import {
     type CommerceProductId,
     enforceOwnedSelection,
@@ -62,6 +63,21 @@ import { Ftue } from "./ui/ftue.ts";
 import { PerformanceHud } from "./ui/performanceHud.ts";
 import "./styles/app.css";
 
+import {
+    refreshNotificationPermission as refreshReturnReminderPermission,
+    resolveReturnLaunch,
+    returnReminders,
+} from "./systems/retention/retentionConfig";
+// Fired at module scope, before any await: this is the only row a player who
+// closes the tab mid-load will ever produce. Emissions here are buffered until
+// markTransportReady() below, once the SDK transport exists.
+analytics.installErrorCapture();
+// Retention: arm the 24/48/72h return cadence and attribute a
+// notification-driven launch. Both are fire-and-forget — a host without
+// notification support must not delay the first playable frame.
+void refreshReturnReminderPermission().then(() => returnReminders.refreshAll());
+void resolveReturnLaunch();
+analytics.funnelStep("load", 1);
 const core = new GameCore();
 const performanceHud = new PerformanceHud();
 let scene: GameScene;
@@ -191,6 +207,9 @@ function startRun(): void {
         inputMode: matchMedia("(pointer: coarse)").matches ? "touch" : "keyboard",
         kit,
     });
+    // Steps 2 and 7 share this call site; the once-ever marks make the second
+    // press register as "came back for another run" without extra bookkeeping.
+    analytics.funnelStep("ftue", saved.records.totalRuns === 0 ? 2 : 7);
 }
 
 function pauseRun(): void {
@@ -270,6 +289,7 @@ function handleEvent(event: GameEvent): void {
         if (!firstDownRecorded) {
             firstDownRecorded = true;
             recordAnalytics("first_enemy_down");
+            analytics.funnelStep("ftue", 3);
         }
     } else if (event.type === "pickup") {
         audioManager.play("pickup");
@@ -304,6 +324,7 @@ function handleEvent(event: GameEvent): void {
         ui.milestone(`LEVEL ${event.level}`, "CLEARED");
         ui.toast(`+${event.bonus} · ${WEAPONS[event.reward].name} DROPPED`);
         recordAnalytics("level_cleared", { level: event.level, bonus: event.bonus, reward: event.reward });
+        analytics.funnelStep("ftue", 5, { level: event.level });
     } else if (event.type === "draft_open") {
         audioManager.play("reward");
         ui.showDraft(event.offers, core.snapshot().level + 1);
@@ -346,6 +367,8 @@ function bankRun(snapshot: CoreSnapshot): void {
         revives: snapshot.revives,
         elapsed: Math.round(snapshot.elapsed),
     });
+    analytics.funnelStep("ftue", 6, { score: snapshot.score, level: snapshot.level });
+    analytics.funnelStep("engagement", saveSystem.get().records.totalRuns, { score: snapshot.score });
 }
 
 function showResults(snapshot: CoreSnapshot): void {
@@ -388,6 +411,7 @@ function finishCoach(): void {
         saveSystem.markControlsSeen();
         void saveSystem.flush();
         recordAnalytics("ftue_completed");
+        analytics.funnelStep("ftue", 4);
     }
 }
 
@@ -447,10 +471,15 @@ function frame(): void {
 async function boot(): Promise<void> {
     updateBoot(12, "LINKING RUN SYSTEMS");
     await initSdk();
+    // The transport exists now — flush everything boot recorded before this
+    // point, then keep emitting in real time.
+    analytics.markTransportReady();
+    analytics.funnelStep("load", 2);
     bindRunSafeArea();
 
     updateBoot(30, "OPENING THE LEDGER");
     saveSource = await saveSystem.load();
+    analytics.funnelStep("load", 3);
     const saved = saveSystem.get();
     initializeRewardedAdsSession();
     initializeInterstitialAdsSession();
@@ -549,6 +578,7 @@ async function boot(): Promise<void> {
             return `${PALETTE_ENTRIES[id].name} INKED`;
         },
         onPurchaseProduct: async (productId: CommerceProductId, placement = "ledger") => {
+            analytics.funnelStep("purchase", 2);
             recordAnalytics("purchase_tapped", { productId, placement });
             const outcome = await purchaseProduct(productId, placement);
             if (!outcome) return "PURCHASE CURRENTLY UNAVAILABLE";
@@ -570,6 +600,10 @@ async function boot(): Promise<void> {
         onClaimDaily: async () => {
             const result = await claimDailyReward();
             recordAnalytics("daily_reward_claim", { ok: result.ok, reward: result.message });
+            // Kill switch: the 24h reminder promises this reward. Leaving it scheduled
+            // pings the player about something they just claimed, which is exactly how
+            // a useful notification becomes a muted one.
+            void returnReminders.cancel("d1");
             if (result.ok) {
                 audioManager.play("reward");
                 haptic("success");
@@ -603,6 +637,7 @@ async function boot(): Promise<void> {
             return outcome;
         },
         onMonetizationSurfaceViewed: (surfaceId) => {
+            analytics.funnelStep("purchase", 1);
             recordAnalytics("monetization_surface_viewed", {
                 surfaceId,
                 placement: `${surfaceId}_screen`,
@@ -637,6 +672,10 @@ async function boot(): Promise<void> {
         onPause: pauseRun,
         onResume: resumeRun,
         onSleep: () => {
+            // Re-anchor the 24h nudge to now, so it lands a day after the player
+            // actually stopped rather than a day after install.
+            void returnReminders.refreshPrimary();
+            analytics.sessionPause();
             core.pause();
             audioManager.setPaused(true);
             void saveSystem.flush();
@@ -646,7 +685,11 @@ async function boot(): Promise<void> {
             void refreshMonetization();
             resumeRun();
         },
-        onQuit: () => void saveSystem.flush(),
+        onQuit: () => {
+            analytics.sessionEnd();
+            void returnReminders.refreshPrimary();
+            void saveSystem.flush();
+        },
         onBackButton: () => {
             const phase = core.snapshot().phase;
             if (phase === "running" || phase === "interlude") pauseRun();
@@ -671,6 +714,10 @@ async function boot(): Promise<void> {
         saveSource,
         orientation: scene.getViewport().orientation,
     });
+    // Boot reached a playable frame; everything after this is the first-run funnel.
+    analytics.funnelStep("load", 4);
+    analytics.funnelStep("ftue", 1, { save_source: saveSource });
+    analytics.sessionStart(saveSystem.get().records.totalRuns === 0);
 
     updateBoot(100, "PAGE READY");
     window.setTimeout(liftBootCover, 140);

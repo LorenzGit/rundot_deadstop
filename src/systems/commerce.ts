@@ -17,6 +17,7 @@ import {
 import { getMonetizationRuntime } from "./monetization/runtime.ts";
 import { saveSystem } from "./save.ts";
 
+import { analytics } from "./analytics/analyticsConfig.ts";
 export type CommerceProductId =
     | "ledger_pack"
     | "no_interstitials"
@@ -363,8 +364,10 @@ export async function purchaseProduct(
         runtime.controls.purchasesEnabled &&
         runtime.controls.products[productId]?.enabled === true;
     if (!enabled || !definition || !item || !getRunCapabilities().shop || getRunCapabilities().mock) return null;
+    analytics.funnelStep("purchase", 3);
     recordAnalytics("checkout_started", { productId, placement });
     const outcome = await purchaseCoordinator.purchase(productId, definition.catalogItemId);
+    analytics.funnelStep("purchase", 4);
     recordAnalytics("checkout_result", { productId, placement, result: outcome.status });
     if (isInkCase(productId)) await redeemPurchasedInk();
     return outcome;

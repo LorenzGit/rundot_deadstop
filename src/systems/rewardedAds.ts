@@ -5,6 +5,7 @@ import { getMonetizationRuntime } from "./monetization/runtime.ts";
 import { saveSystem } from "./save.ts";
 import { serverNow, trustedTimeGate } from "./serverTime.ts";
 
+import { analytics } from "./analytics/analyticsConfig.ts";
 const SECOND_WIND_PLACEMENT_ID = "rewarded_second_wind";
 const registeredPlacement = monetizationPlacements.require(SECOND_WIND_PLACEMENT_ID);
 if (registeredPlacement.type !== "rewarded") {
@@ -149,6 +150,9 @@ export async function testRewardedAd(onPresentationChange?: (visible: boolean) =
         adType: "rewarded",
         source: "private_test_bay",
     });
+    // Portfolio-standard name alongside the game's own, so rewarded funnels
+    // compare across titles.
+    analytics.event("rewarded_ad_offered", { ad_display_id: SECOND_WIND_PLACEMENT_ID });
     onPresentationChange?.(true);
     const completed = await showRewardedAd(placement.id, `${placement.displayName} · Private Test`);
     onPresentationChange?.(false);
@@ -163,6 +167,7 @@ export async function testRewardedAd(onPresentationChange?: (visible: boolean) =
         rewardedReady = false;
         return { granted: false, message: "VIDEO NOT COMPLETED · NOTHING GRANTED" };
     }
+    analytics.event("rewarded_ad_complete", { ad_display_id: SECOND_WIND_PLACEMENT_ID, source: "private_test_bay" });
     return { granted: true, message: "VIDEO CONFIRMED · NO REVIVE OUTSIDE A RUN" };
 }
 
@@ -181,6 +186,9 @@ export async function claimSecondWind(
 
     requestInFlight = true;
     recordAnalytics("ad_requested", { placementId: SECOND_WIND_PLACEMENT_ID, adType: "rewarded" });
+    // Portfolio-standard name alongside the game's own, so rewarded funnels
+    // compare across titles.
+    analytics.event("rewarded_ad_offered", { ad_display_id: SECOND_WIND_PLACEMENT_ID });
     onPresentationChange?.(true);
     const completed = await showRewardedAd(placement.id, placement.displayName);
     onPresentationChange?.(false);
@@ -194,6 +202,7 @@ export async function claimSecondWind(
         rewardedReady = false;
         return { granted: false, message: "VIDEO NOT COMPLETED · NOTHING CHANGED" };
     }
+    analytics.event("rewarded_ad_complete", { ad_display_id: SECOND_WIND_PLACEMENT_ID });
 
     const applied = saveSystem.recordRewardedCompletion({
         claimId: claimId(),

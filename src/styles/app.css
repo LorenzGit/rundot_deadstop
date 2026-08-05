@@ -106,6 +106,14 @@ body {
 
 .ink-button {
     position: relative;
+    /*
+     * Padding + line-height alone computed to 43px — one pixel under the
+     * reliable touch minimum, in BOTH orientations (the size is vmax-derived,
+     * so rotating does not change it), and invisible to any static read of the
+     * stylesheet. Pin the floor rather than re-tuning the padding, so the fix
+     * survives future type-scale changes.
+     */
+    min-height: 44px;
     padding: 11px 20px 12px;
     font: 700 clamp(13px, 1.6vmax, 17px) / 1 var(--display);
     letter-spacing: 0.14em;
@@ -162,6 +170,7 @@ body {
 }
 
 .ink-icon-button {
+    position: relative;
     display: grid;
     place-items: center;
     width: 40px;
@@ -172,6 +181,25 @@ body {
     border-radius: 12px 9px 13px 8px / 8px 13px 9px 12px;
     box-shadow: 2px 3px 0 var(--ink);
     cursor: pointer;
+}
+
+/*
+ * 44x44 is the minimum reliable touch target; this glyph box is 40.
+ *
+ * On a phone this is already handled: the game is landscape-locked, so the
+ * `@media (max-height: 460px)` block below matches during play and sizes these
+ * to 44. It does NOT match in landscape on a tablet, which is the case this
+ * covers. Rather than grow the art, project a transparent hit area past the
+ * edges — the button looks identical and stops eating taps.
+ */
+.ink-icon-button::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    translate: -50% -50%;
 }
 
 .pause-button span {
@@ -1615,4 +1643,37 @@ html[data-reduced-motion="true"] .screen.active {
     .sheet-header h2 {
         font-size: clamp(20px, 6vmin, 30px);
     }
+}
+
+/*
+ * Numeric readouts use tabular figures so digits share a fixed advance width.
+ * With proportional figures a score ticking 1109 -> 1110 visibly reflows and
+ * the whole counter jitters — the cheapest possible fix for a HUD that reads
+ * as unstable during play.
+ */
+.hud-score,
+.hud-combo,
+.results-score,
+.stats-grid,
+.hud-score-slot,
+.hud-level-slot,
+[data-numeric] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+}
+
+/*
+ * Hand cursor on anything clickable.
+ *
+ * A native <button> does NOT get a pointer cursor by default — browsers render
+ * the plain arrow — so it has to be asked for. Without this, desktop players
+ * get no hover affordance and the UI reads as inert. Element-selector
+ * specificity is the weakest there is, so any existing per-class `cursor` rule
+ * (including `default` or `not-allowed`) still wins.
+ */
+button:not(:disabled),
+summary,
+[role="button"]:not([aria-disabled="true"]),
+label[for] {
+    cursor: pointer;
 }

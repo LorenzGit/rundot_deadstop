@@ -411,6 +411,17 @@ export function recordAnalytics(eventName: string, payload: Record<string, unkno
     void RundotGameAPI.analytics.recordCustomEvent(eventName, payload).catch(() => undefined);
 }
 
+/**
+ * Register an ordered funnel step. Distinct from recordAnalytics: a custom
+ * event is a point in time, whereas a funnel step belongs to a named, ordered
+ * sequence the dashboard can draw a drop-off curve for. Step numbers and names
+ * are frozen once deployed.
+ */
+export function recordFunnelStep(step: number, name: string, funnel: string, funnelOrder = 0): void {
+    if (!capabilities.analytics) return;
+    void RundotGameAPI.analytics.trackFunnelStep(step, name, funnel, funnelOrder).catch(() => undefined);
+}
+
 export interface LifecycleConfig {
     onPause?: () => void;
     onResume?: () => void;
@@ -460,5 +471,48 @@ export async function requestHostExit(): Promise<boolean> {
         );
     } catch {
         return false;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Return-reminder support. Kept beside the other notification calls so the
+// retention module never talks to RundotGameAPI directly.
+// ---------------------------------------------------------------------------
+
+/** Alias matching the shared retention module's expected name. */
+export async function notificationsEnabled(): Promise<boolean> {
+    return localNotificationsEnabled();
+}
+
+/**
+ * Cancel-then-schedule, so re-arming re-anchors the timer rather than stacking
+ * a second copy of the same reminder.
+ */
+export async function rearmLocalNotification(input: {
+    id: string;
+    title: string;
+    body: string;
+    delaySeconds: number;
+}): Promise<boolean> {
+    await cancelLocalNotification(input.id);
+    return scheduleLocalNotification({
+        notificationId: input.id,
+        title: input.title,
+        body: input.body,
+        delaySeconds: input.delaySeconds,
+    });
+}
+
+/**
+ * How this session was launched. `timed_out` is treated as unknown rather than
+ * organic, so notification attribution never over-counts cold starts.
+ */
+export async function resolveLaunchIntent(): Promise<{ kind: string; params: Record<string, string> } | null> {
+    try {
+        const intent = await RundotGameAPI.app.resolveLaunchIntent({ maxWaitMs: 800 });
+        if (!intent || intent.kind === "timed_out") return null;
+        return { kind: intent.kind, params: intent.params ?? {} };
+    } catch {
+        return null;
     }
 }

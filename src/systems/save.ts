@@ -2,6 +2,7 @@ import type { BoosterId } from "../game/config.ts";
 import { getRunCapabilities, readAppStorage, writeAppStorage } from "../sdk/runSdk.ts";
 import type { PaletteId } from "./cosmetics.ts";
 import type { PendingPurchaseIntent } from "./monetization/purchaseCoordinator.ts";
+import { analytics } from "./analytics/analyticsConfig.ts";
 import {
     createDefaultGameSave,
     type GameSaveV1,
@@ -109,6 +110,23 @@ export const saveSystem = {
 
     recordRun(result: RunResult): void {
         const ink = nonNegativeInteger(result.ink);
+        // Milestones are read BEFORE the records are overwritten — afterwards
+        // the previous best is gone and "was this a personal best?" is
+        // unanswerable.
+        if (Math.floor(result.score) > state.records.bestScore) {
+            analytics.event("milestone_reached", {
+                milestone: "best_score",
+                value: Math.floor(result.score),
+                previous: state.records.bestScore,
+            });
+        }
+        if (Math.floor(result.level) > state.records.deepestLevel) {
+            analytics.event("milestone_reached", {
+                milestone: "deepest_level",
+                value: Math.floor(result.level),
+                previous: state.records.deepestLevel,
+            });
+        }
         state = {
             ...state,
             records: {
