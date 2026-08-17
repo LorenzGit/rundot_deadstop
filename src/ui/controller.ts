@@ -18,6 +18,7 @@ import { saveSystem } from "../systems/save.ts";
 import { boosterIcon, weaponIcon } from "./boosterIcons.ts";
 import type { FtueStep } from "./ftue.ts";
 import { floatingStickVector } from "./touchStick.ts";
+import { analytics } from "../systems/analytics/analyticsConfig.ts";
 
 export interface RunSummary {
     score: number;
@@ -1324,7 +1325,25 @@ export class UiController {
         }
     }
 
+    /**
+     * Reports whichever screen the markup already had active at boot.
+     *
+     * `activate()` only runs on navigation, so the first and most important
+     * screen view — the menu a player lands on — never fired. Must be called
+     * once, after the analytics transport is ready.
+     */
+    reportInitialScreen(): void {
+        for (const [name, element] of Object.entries(this.screens)) {
+            if (element.classList.contains("active")) {
+                analytics.event("screen_viewed", { screen: name });
+                return;
+            }
+        }
+    }
+
     private activate(name: keyof UiController["screens"]): void {
+        // Every screen change in the game funnels through here.
+        analytics.event("screen_viewed", { screen: name });
         this.deactivateAll();
         this.screens[name].classList.add("active");
         this.flow();

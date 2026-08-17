@@ -1,4 +1,4 @@
-import { fetchLiveOpsConfig } from "../../sdk/runSdk.ts";
+import { fetchLiveOpsConfig, getRunCapabilities } from "../../sdk/runSdk.ts";
 import {
     type MonetizationLiveOps,
     type MonetizationLiveOpsInput,
@@ -22,12 +22,28 @@ function monetizationInput(value: unknown): MonetizationLiveOpsInput | null {
     return value as MonetizationLiveOpsInput;
 }
 
+let retryTimer = 0;
+
 export async function refreshMonetizationRuntime(): Promise<void> {
+    window.clearTimeout(retryTimer);
+    retryTimer = 0;
     const config = await fetchLiveOpsConfig();
+    if (!config) {
+        // KEEP the live controls on a failed fetch: re-normalizing null here
+        // yanked every enabled monetization surface for the rest of the
+        // session on a single resume-time network blip. Retry only where a
+        // host could actually answer — without the capability this null is
+        // permanent.
+        runtime = { ...runtime, loaded: true };
+        if (getRunCapabilities().liveops) {
+            retryTimer = window.setTimeout(() => void refreshMonetizationRuntime(), 60_000);
+        }
+        return;
+    }
     runtime = {
         loaded: true,
-        configVersion: config?.configVersion ?? null,
-        controls: normalizeMonetizationLiveOps(monetizationInput(config?.values.monetization)),
+        configVersion: config.configVersion,
+        controls: normalizeMonetizationLiveOps(monetizationInput(config.values.monetization)),
     };
 }
 

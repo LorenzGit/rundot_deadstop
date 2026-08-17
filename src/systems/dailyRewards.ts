@@ -58,7 +58,13 @@ export async function claimDailyReward(): Promise<{ ok: boolean; message: string
     }
     const saved = await saveSystem.flush();
     if (!saved) {
-        saveSystem.restore(applied.previous);
+        // Delta revert, not a snapshot restore: ink earned elsewhere while the
+        // flush was in flight must survive the rollback.
+        saveSystem.revertDailyReward({
+            day: gate.day,
+            ink: reward.ink,
+            previousLastClaimDay: before.dailyRewards.lastClaimDay,
+        });
         claimInFlight = false;
         return { ok: false, message: "SAVE FAILED · REWARD ROLLED BACK" };
     }

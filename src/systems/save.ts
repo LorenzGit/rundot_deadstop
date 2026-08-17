@@ -144,6 +144,15 @@ export const saveSystem = {
             },
             wallet: { ink: state.wallet.ink + ink },
         };
+        // Canonical economy beats. Ink enters and leaves the wallet only through
+        // this module, so instrumenting the accessors covers the whole economy.
+        if (ink > 0)
+            analytics.event("currency_earned", {
+                currency: "ink",
+                amount: ink,
+                source: "run",
+                balance_after: state.wallet.ink,
+            });
     },
 
     setKit(kit: readonly BoosterId[]): void {
@@ -155,6 +164,7 @@ export const saveSystem = {
         const amount = nonNegativeInteger(cost);
         if (state.wallet.ink < amount) return false;
         state = { ...state, wallet: { ink: state.wallet.ink - amount } };
+        analytics.event("currency_spent", { currency: "ink", amount, sink: "kit", balance_after: state.wallet.ink });
         return true;
     },
 
@@ -174,6 +184,12 @@ export const saveSystem = {
                 redeemedOrderIds: [...state.monetization.redeemedOrderIds, orderId].slice(-90),
             },
         };
+        analytics.event("currency_earned", {
+            currency: "ink",
+            amount,
+            source: "iap_order",
+            balance_after: state.wallet.ink,
+        });
         return true;
     },
 
@@ -193,6 +209,13 @@ export const saveSystem = {
                 unlockedPaletteIds: [...state.cosmetics.unlockedPaletteIds, paletteId],
             },
         };
+        analytics.event("currency_spent", {
+            currency: "ink",
+            amount: cost,
+            sink: "palette",
+            item_id: paletteId,
+            balance_after: state.wallet.ink,
+        });
         return true;
     },
 
@@ -265,6 +288,27 @@ export const saveSystem = {
             },
         };
         return { ok: true, reason: "ready", previous };
+    },
+
+    /**
+     * Undo a granted-but-unsaved daily reward by DELTA against the current
+     * state, not by restoring the pre-claim snapshot: anything else the player
+     * earned between the grant and the failed flush must survive the rollback.
+     */
+    revertDailyReward(input: { day: string; ink: number; previousLastClaimDay: string | null }): void {
+        const claimId = `daily-reward:${input.day}`;
+        if (!state.dailyRewards.claimIds.includes(claimId)) return;
+        const ink = nonNegativeInteger(input.ink);
+        state = {
+            ...state,
+            wallet: { ink: Math.max(0, state.wallet.ink - ink) },
+            progress: { ...state.progress, lifetimeInk: Math.max(0, state.progress.lifetimeInk - ink) },
+            dailyRewards: {
+                lastClaimDay: input.previousLastClaimDay,
+                totalClaims: Math.max(0, state.dailyRewards.totalClaims - 1),
+                claimIds: state.dailyRewards.claimIds.filter((id) => id !== claimId),
+            },
+        };
     },
 
     restore(snapshot: GameSaveV1): void {

@@ -14,6 +14,7 @@ import {
     type PendingPurchaseIntent,
     type PurchaseOutcome,
 } from "./monetization/purchaseCoordinator.ts";
+import { checkoutErrorCode, verdictForCode, verdictForMessage } from "./monetization/checkoutClassification.ts";
 import { getMonetizationRuntime } from "./monetization/runtime.ts";
 import { saveSystem } from "./save.ts";
 
@@ -142,11 +143,26 @@ export async function redeemPurchasedInk(): Promise<number> {
     return granted;
 }
 
+/** The host accepted the order but has not settled it — outcome still open. */
+class UnsettledOrderError extends Error {
+    constructor(status: string | undefined) {
+        super(`RUN shop returned order status "${status ?? "none"}"`);
+    }
+}
+
 const purchaseCoordinator = createPurchaseCoordinator<ShopPurchaseResponse, ShopOrderHistoryResponse>({
     shop: {
         async purchase(itemId, idempotencyKey) {
             const response = await purchaseShopItem(itemId, idempotencyKey);
-            if (!response.success) throw new Error("RUN SHOP DID NOT CONFIRM THE ORDER");
+            // `success` only reports that the host accepted the request.
+            // Replaying an idempotency key returns the ORIGINAL order verbatim,
+            // so an order still in `pending_payment` also arrives as
+            // `success: true` — paying out on that would grant an unpaid
+            // purchase, and the player may still have been charged, so it has
+            // to stay unresolved rather than be written off.
+            if (!response.success || response.order?.status !== "fulfilled") {
+                throw new UnsettledOrderError(response.order?.status);
+            }
             return response;
         },
         getOrderHistory: fetchShopOrderHistory,
@@ -175,12 +191,17 @@ const purchaseCoordinator = createPurchaseCoordinator<ShopPurchaseResponse, Shop
     },
     syncEntitlements,
     classifyError(error) {
-        const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-        if (message.includes("cancel")) return "cancelled";
-        if (message.includes("declin") || message.includes("insufficient") || message.includes("unavailable")) {
-            return "failed";
+        // An order the host never settled may already have taken the money.
+        if (error instanceof UnsettledOrderError) return "unknown";
+        // The host names most declines outright; that code is the only reliable
+        // way to tell a clean, uncharged refusal from an ambiguous failure.
+        const code = checkoutErrorCode(error);
+        if (code) {
+            const verdict = verdictForCode(code);
+            if (verdict !== "unknown") return verdict;
         }
-        return "unknown";
+        // Otherwise fall back to the host's human-readable message.
+        return verdictForMessage(error instanceof Error ? error.message : String(error));
     },
 });
 
@@ -365,10 +386,14 @@ export async function purchaseProduct(
         runtime.controls.products[productId]?.enabled === true;
     if (!enabled || !definition || !item || !getRunCapabilities().shop || getRunCapabilities().mock) return null;
     analytics.funnelStep("purchase", 3);
-    recordAnalytics("checkout_started", { productId, placement });
+    recordAnalytics("iap_purchase_started", { productId, placement });
     const outcome = await purchaseCoordinator.purchase(productId, definition.catalogItemId);
     analytics.funnelStep("purchase", 4);
-    recordAnalytics("checkout_result", { productId, placement, result: outcome.status });
+    recordAnalytics(outcome.status === "confirmed" ? "iap_purchase_complete" : "iap_purchase_failed", {
+        productId,
+        placement,
+        result: outcome.status,
+    });
     if (isInkCase(productId)) await redeemPurchasedInk();
     return outcome;
 }
@@ -380,7 +405,7 @@ export async function reconcilePendingPurchase(): Promise<void> {
     if (!pending) return;
     const outcome = await purchaseCoordinator.reconcilePending();
     if (outcome) {
-        recordAnalytics("checkout_result", {
+        recordAnalytics(outcome.status === "confirmed" ? "iap_purchase_complete" : "iap_purchase_failed", {
             productId: pending.productId,
             placement: "resume_reconciliation",
             result: outcome.status,

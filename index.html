@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         <meta name="theme-color" content="#f4eee1" />
         <meta name="color-scheme" content="light" />
         <link rel="icon" href="./thumbnail.jpg" type="image/jpeg" />
@@ -517,6 +517,48 @@
             </div>
         </main>
 
+        <!--
+            Boot watchdog.
+
+            Every recovery path in this game lives inside main.ts: the boot()
+            catch, the host handshake timeout, the asset timeouts. All of them
+            need the module bundle to have executed. When the bundle itself
+            never fetches, never parses, or throws at import time on an old
+            WebView, none of it runs and #boot-cover stays up forever with an
+            animating progress bar and no way out — the player just sees a
+            loading screen that never ends.
+
+            A classic script on purpose: it must run even when the module graph
+            is the thing that failed. Cleared by liftBootCover(), so it can
+            never fire behind a healthy boot.
+        -->
+        <script>
+            (function () {
+                var timer = window.setTimeout(function () {
+                    var cover = document.getElementById("boot-cover");
+                    if (!cover || cover.classList.contains("hidden")) return;
+                    var copy = document.getElementById("boot-copy");
+                    if (copy) copy.textContent = "COULD NOT LOAD";
+                    var track = cover.querySelector(".boot-track");
+                    if (track && track.parentNode) track.parentNode.removeChild(track);
+                    var panel = cover.querySelector(".boot-panel") || cover;
+                    var hint = document.createElement("p");
+                    hint.textContent = "Check your connection and reload.";
+                    hint.style.cssText = "margin:10px 0 0;font-size:13px;opacity:.8";
+                    var retry = document.createElement("button");
+                    retry.type = "button";
+                    retry.textContent = "RELOAD";
+                    retry.style.cssText =
+                        "margin-top:14px;min-height:44px;padding:0 22px;font:inherit;font-size:14px;" +
+                        "cursor:pointer;border:1px solid currentColor;border-radius:8px;" +
+                        "background:transparent;color:inherit";
+                    retry.addEventListener("click", function () { window.location.reload(); });
+                    panel.appendChild(hint);
+                    panel.appendChild(retry);
+                }, 20000);
+                window.__bootWatchdog = timer;
+            })();
+        </script>
         <script type="module" src="/src/main.ts"></script>
     </body>
 </html>

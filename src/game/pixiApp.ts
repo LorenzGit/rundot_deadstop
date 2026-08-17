@@ -58,7 +58,10 @@ export async function createPixiApp(host: HTMLElement): Promise<Application> {
         }
     }
 
-    const rendererName = app.renderer.constructor.name.toLowerCase().includes("webgpu") ? "webgpu" : "webgl";
+    // Never detect via constructor.name: minification renames the class, which
+    // made prod builds misread WebGPU as WebGL and tear it down every session.
+    // Pixi's renderer.name is the literal backend string on both backends.
+    const rendererName = app.renderer.name.toLowerCase().includes("webgpu") ? "webgpu" : "webgl";
     if (rendererName === "webgl" && rendererReason === "WEBGPU ACTIVE") {
         rendererReason = "PIXI SELECTED WEBGL";
     }

@@ -1,6 +1,6 @@
 {
   "name": "deadstop",
-  "version": "1.13.2",
+  "version": "1.13.8",
   "description": "An ink-on-paper stick-figure roguelike gunfight where time only moves when you do.",
   "private": true,
   "type": "module",
@@ -15,6 +15,7 @@
     "protobufjs": false
   },
   "scripts": {
+    "version:check": "node scripts/check-deployed-version.mjs",
     "dev": "vite",
     "dev:playground": "cross-env RUNDOT_PLAYGROUND=1 vite",
     "format": "biome format --write .",

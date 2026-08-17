@@ -17,9 +17,11 @@ import {
     bindRunSafeArea,
     initSdk,
     recordAnalytics,
+    refreshRunCapabilities,
     registerLifecycles,
     requestHostExit,
     triggerHaptic,
+    submitLeaderboardScore,
 } from "./sdk/runSdk.ts";
 import { analytics } from "./systems/analytics/analyticsConfig.ts";
 import {
@@ -72,6 +74,10 @@ import {
 // closes the tab mid-load will ever produce. Emissions here are buffered until
 // markTransportReady() below, once the SDK transport exists.
 analytics.installErrorCapture();
+// The browser's own end-of-session signals. onQuit alone produced two
+// session_end events across the whole fleet in thirty days, because it
+// needs a clean host quit and players just close the tab.
+analytics.installSessionEndCapture();
 // Retention: arm the 24/48/72h return cadence and attribute a
 // notification-driven launch. Both are fire-and-forget — a host without
 // notification support must not delay the first playable frame.
@@ -122,6 +128,9 @@ function updateBoot(progress: number, copy: string): void {
 }
 
 function liftBootCover(): void {
+    // The game owns the screen now; the HTML watchdog must not fire behind it.
+    const watchdog = (window as unknown as { __bootWatchdog?: number }).__bootWatchdog;
+    if (watchdog !== undefined) window.clearTimeout(watchdog);
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             const cover = document.getElementById("boot-cover");
@@ -193,6 +202,9 @@ function startRun(): void {
     ui.showRunning();
     ui.setLevelPlan(planLabel(core.snapshot()), levelNote(1));
     ftue = new Ftue(saveSystem.get().progress.controlsSeen);
+    // Canonical onboarding beats. Kept here rather than inside Ftue: that module
+    // is imported by the headless simulator and must stay free of host imports.
+    if (!saveSystem.get().progress.controlsSeen) analytics.event("ftue_started", { coach: "controls" });
     // Anchor the travel tracker to the spawn point. Left at the origin, the
     // first frame reads as a ~700 unit leap and satisfies the walk lesson
     // before the player has touched anything.
@@ -209,7 +221,14 @@ function startRun(): void {
     });
     // Steps 2 and 7 share this call site; the once-ever marks make the second
     // press register as "came back for another run" without extra bookkeeping.
-    analytics.funnelStep("ftue", saved.records.totalRuns === 0 ? 2 : 7);
+    // Step 7 is gated on step 6 having fired — an abandon-then-restart
+    // otherwise put more players at "second run" than at "first run ended",
+    // the exact non-monotonic shape that reads as broken instrumentation.
+    if (saved.records.totalRuns === 0) {
+        analytics.funnelStep("ftue", 2);
+    } else if (!analytics.isFirstTime("ftue", 6)) {
+        analytics.funnelStep("ftue", 7);
+    }
 }
 
 function pauseRun(): void {
@@ -323,7 +342,7 @@ function handleEvent(event: GameEvent): void {
         haptic("success");
         ui.milestone(`LEVEL ${event.level}`, "CLEARED");
         ui.toast(`+${event.bonus} · ${WEAPONS[event.reward].name} DROPPED`);
-        recordAnalytics("level_cleared", { level: event.level, bonus: event.bonus, reward: event.reward });
+        recordAnalytics("level_completed", { level: event.level, bonus: event.bonus, reward: event.reward });
         analytics.funnelStep("ftue", 5, { level: event.level });
     } else if (event.type === "draft_open") {
         audioManager.play("reward");
@@ -357,7 +376,12 @@ function bankRun(snapshot: CoreSnapshot): void {
         ink,
     });
     void saveSystem.flush();
-    recordAnalytics("run_ended", {
+    // "defeat" is the only terminal phase in core.ts — a deadstop run never
+    // ends in a win — so this is unambiguously run_failed, not run_completed.
+    // Boards were configured but nothing ever submitted, so they read as
+    // "zero scored players". Fire-and-forget: never blocks the results flow.
+    void submitLeaderboardScore(snapshot.score, snapshot.elapsed);
+    recordAnalytics("run_failed", {
         score: snapshot.score,
         level: snapshot.level,
         downs: snapshot.downs,
@@ -579,7 +603,7 @@ async function boot(): Promise<void> {
         },
         onPurchaseProduct: async (productId: CommerceProductId, placement = "ledger") => {
             analytics.funnelStep("purchase", 2);
-            recordAnalytics("purchase_tapped", { productId, placement });
+            recordAnalytics("offer_clicked", { productId, placement });
             const outcome = await purchaseProduct(productId, placement);
             if (!outcome) return "PURCHASE CURRENTLY UNAVAILABLE";
             await refreshCommerce();
@@ -638,14 +662,14 @@ async function boot(): Promise<void> {
         },
         onMonetizationSurfaceViewed: (surfaceId) => {
             analytics.funnelStep("purchase", 1);
-            recordAnalytics("monetization_surface_viewed", {
+            recordAnalytics("store_opened", {
                 surfaceId,
                 placement: `${surfaceId}_screen`,
                 progression: saveSystem.get().records.deepestLevel,
             });
         },
         onAdOfferViewed: (status: string) => {
-            recordAnalytics("ad_offer_viewed", {
+            recordAnalytics("offer_shown", {
                 placementId: "rewarded_second_wind",
                 adType: "rewarded",
                 rewardId: "second_wind_revive",
@@ -681,6 +705,9 @@ async function boot(): Promise<void> {
             void saveSystem.flush();
         },
         onAwake: () => {
+            // onAwake is the SDK's "refresh stale data" hook; a long suspend
+            // can span a settings change or a delayed host attach.
+            refreshRunCapabilities();
             void refreshServerTime();
             void refreshMonetization();
             resumeRun();
@@ -709,7 +736,7 @@ async function boot(): Promise<void> {
             `[monetization] ${monetizationPlacements.all().length} placements and ${monetizationProducts.all().length} products stay fail-closed until the RUN catalog and LiveOps controls are live.`,
         );
     }
-    recordAnalytics("game_loaded", {
+    recordAnalytics("game_opened", {
         version: __APP_VERSION__,
         saveSource,
         orientation: scene.getViewport().orientation,
@@ -718,6 +745,9 @@ async function boot(): Promise<void> {
     analytics.funnelStep("load", 4);
     analytics.funnelStep("ftue", 1, { save_source: saveSource });
     analytics.sessionStart(saveSystem.get().records.totalRuns === 0);
+    // The boot screen is active in the markup, so it never passes through
+    // activate(); without this the landing screen is missing from every session.
+    ui.reportInitialScreen();
 
     updateBoot(100, "PAGE READY");
     window.setTimeout(liftBootCover, 140);

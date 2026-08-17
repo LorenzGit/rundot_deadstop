@@ -21,6 +21,7 @@ export interface RunCapabilities {
     shop: boolean;
     entitlements: boolean;
     notifications: boolean;
+    leaderboard: boolean;
 }
 
 const OFFLINE_CAPABILITIES: RunCapabilities = {
@@ -34,6 +35,7 @@ const OFFLINE_CAPABILITIES: RunCapabilities = {
     shop: false,
     entitlements: false,
     notifications: false,
+    leaderboard: false,
 };
 
 let ready = false;
@@ -45,31 +47,49 @@ function namespaceAvailable(name: string): boolean {
     return typeof (RundotGameAPI as unknown as Record<string, unknown>)[name] === "object";
 }
 
+// Haptics support comes from DeviceInfo, and the trigger lives on the API
+// root. Read LIVE at every call site that acts on it: `enabled` reflects the
+// player's system setting, which can change mid-session, and a cached false
+// at boot must never gate a later action.
+function hapticsAvailableNow(): boolean {
+    if (!ready) return false;
+    try {
+        const device = RundotGameAPI.system.getDevice();
+        return device?.haptics?.supported === true && device?.haptics?.enabled === true;
+    } catch {
+        return false;
+    }
+}
+
 function snapshotCapabilities(): RunCapabilities {
     if (!ready) return OFFLINE_CAPABILITIES;
     const environment = RundotGameAPI._environmentData?.capabilities;
-    let haptics = false;
-    try {
-        const device = RundotGameAPI.system.getDevice();
-        haptics = device?.haptics?.supported === true && device?.haptics?.enabled === true;
-    } catch {
-        haptics = false;
-    }
     return {
         host: true,
         mock: RundotGameAPI.isMock(),
         storage: namespaceAvailable("appStorage"),
         analytics: namespaceAvailable("analytics"),
-        haptics,
+        haptics: hapticsAvailableNow(),
         ads: namespaceAvailable("ads") && environment?.ads !== false,
         liveops: namespaceAvailable("liveops"),
         shop: namespaceAvailable("shop") && environment?.purchases === true,
         entitlements: namespaceAvailable("entitlements"),
         notifications: namespaceAvailable("notifications"),
+        leaderboard: namespaceAvailable("leaderboard"),
     };
 }
 
 export function getRunCapabilities(): Readonly<RunCapabilities> {
+    return capabilities;
+}
+
+/**
+ * Re-read host capabilities. Wired to onAwake (the SDK's "refresh stale data"
+ * hook) so a session that started before a grant or attach does not stay
+ * frozen on its boot snapshot.
+ */
+export function refreshRunCapabilities(): Readonly<RunCapabilities> {
+    capabilities = snapshotCapabilities();
     return capabilities;
 }
 
@@ -101,8 +121,34 @@ export async function initSdk(): Promise<boolean> {
     } while (performance.now() < deadline);
 
     capabilities = snapshotCapabilities();
-    if (!ready) console.info("[runSdk] RUN host unavailable; local fallbacks active");
+    if (!ready) {
+        console.info("[runSdk] RUN host unavailable; local fallbacks active");
+        // Inside an iframe the host is expected — a cold WebView can simply be
+        // slower than the bounded handshake. Keep watching so a late attach
+        // upgrades this session instead of stranding it offline until relaunch.
+        if (embedded) watchForLateHostAttach();
+    }
     return ready;
+}
+
+function watchForLateHostAttach(): void {
+    const deadline = performance.now() + 30_000;
+    const watcher = window.setInterval(() => {
+        try {
+            if (RundotGameAPI.isAvailable() || RundotGameAPI.isMock()) {
+                window.clearInterval(watcher);
+                ready = true;
+                capabilities = snapshotCapabilities();
+                applyRunSafeArea();
+                console.info("[runSdk] RUN host attached after the boot handshake; capabilities refreshed");
+                return;
+            }
+        } catch {
+            window.clearInterval(watcher);
+            return;
+        }
+        if (performance.now() >= deadline) window.clearInterval(watcher);
+    }, 500);
 }
 
 export function applyRunSafeArea(): void {
@@ -198,6 +244,35 @@ export async function fetchLiveOpsConfig(): Promise<LiveOpsConfigResult | null> 
     }
 }
 
+/**
+ * Submit a run score to the default leaderboard.
+ *
+ * Boards are already configured for this game but had zero scored players,
+ * because nothing ever submitted. Fire-and-forget: a rejected or unavailable
+ * board must never interrupt the results flow, so this resolves to a message
+ * rather than throwing.
+ */
+export async function submitLeaderboardScore(score: number, durationSeconds: number): Promise<string | null> {
+    if (!capabilities.leaderboard || score <= 0) return null;
+    try {
+        const result = await withTimeout(
+            RundotGameAPI.leaderboard.submitScore({
+                score: Math.max(0, Math.round(score)),
+                duration: Math.max(1, Math.round(durationSeconds)),
+                mode: "classic",
+                period: "alltime",
+            }),
+            8000,
+            "leaderboard.submitScore",
+        );
+        if (!result?.accepted) return null;
+        return result.rank ? `Leaderboard rank #${result.rank}!` : "Score submitted.";
+    } catch (error) {
+        console.warn("[runSdk] leaderboard submit unavailable", error);
+        return null;
+    }
+}
+
 export async function isRewardedAdReady(): Promise<boolean> {
     if (!capabilities.ads) return false;
     try {
@@ -211,7 +286,7 @@ export async function isRewardedAdReady(): Promise<boolean> {
 export async function showRewardedAd(placementId: string, placementName: string): Promise<boolean> {
     if (!capabilities.ads) return false;
     try {
-        return await withTimeout(
+        const completed = await withTimeout(
             RundotGameAPI.ads.showRewardedAdAsync({
                 adDisplayId: placementId,
                 adDisplayName: placementName,
@@ -219,8 +294,14 @@ export async function showRewardedAd(placementId: string, placementName: string)
             120_000,
             "ads.showRewardedAdAsync",
         );
+        // Both branches, or the funnel cannot tell a refusal from an unfilled ad.
+        void recordAnalytics(completed ? "rewarded_ad_watched" : "rewarded_ad_dismissed", {
+            ad_display_id: placementId,
+        });
+        return completed;
     } catch (error) {
         console.warn("[runSdk] rewarded ad unavailable", error);
+        void recordAnalytics("rewarded_ad_dismissed", { ad_display_id: placementId, reason: "error" });
         return false;
     }
 }
@@ -371,7 +452,9 @@ export async function cancelLocalNotification(notificationId: string): Promise<b
 export type HapticStyle = "light" | "medium" | "heavy" | "success" | "warning" | "error";
 
 export async function triggerHaptic(style: HapticStyle): Promise<boolean> {
-    if (capabilities.haptics) {
+    // Live read, not the boot snapshot: the player can flip the system haptics
+    // setting mid-session and the next trigger must honor it.
+    if (hapticsAvailableNow()) {
         const styleMap: Record<HapticStyle, HapticFeedbackStyle> = {
             light: HapticFeedbackStyle.Light,
             medium: HapticFeedbackStyle.Medium,

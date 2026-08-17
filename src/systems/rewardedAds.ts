@@ -167,7 +167,7 @@ export async function testRewardedAd(onPresentationChange?: (visible: boolean) =
         rewardedReady = false;
         return { granted: false, message: "VIDEO NOT COMPLETED · NOTHING GRANTED" };
     }
-    analytics.event("rewarded_ad_complete", { ad_display_id: SECOND_WIND_PLACEMENT_ID, source: "private_test_bay" });
+    analytics.event("rewarded_ad_watched", { ad_display_id: SECOND_WIND_PLACEMENT_ID, source: "private_test_bay" });
     return { granted: true, message: "VIDEO CONFIRMED · NO REVIVE OUTSIDE A RUN" };
 }
 
@@ -202,7 +202,7 @@ export async function claimSecondWind(
         rewardedReady = false;
         return { granted: false, message: "VIDEO NOT COMPLETED · NOTHING CHANGED" };
     }
-    analytics.event("rewarded_ad_complete", { ad_display_id: SECOND_WIND_PLACEMENT_ID });
+    analytics.event("rewarded_ad_watched", { ad_display_id: SECOND_WIND_PLACEMENT_ID });
 
     const applied = saveSystem.recordRewardedCompletion({
         claimId: claimId(),
@@ -212,7 +212,7 @@ export async function claimSecondWind(
     if (!applied.ok) return { granted: false, message: "SECOND WIND ALREADY USED THIS RUN" };
     completedThisSession += 1;
     await saveSystem.flush();
-    recordAnalytics("reward_granted", {
+    recordAnalytics("reward_claimed", {
         placementId: SECOND_WIND_PLACEMENT_ID,
         rewardId: placement.rewardId,
         amount: 1,
