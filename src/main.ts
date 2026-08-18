@@ -22,6 +22,7 @@ import {
     requestHostExit,
     triggerHaptic,
     submitLeaderboardScore,
+    showContextualLikePrompt,
 } from "./sdk/runSdk.ts";
 import { analytics } from "./systems/analytics/analyticsConfig.ts";
 import {
@@ -392,6 +393,8 @@ function handleEvent(event: GameEvent): void {
         ui.milestone(`LEVEL ${event.level}`, "CLEARED");
         ui.toast(`+${event.bonus} · ${WEAPONS[event.reward].name} DROPPED`);
         recordAnalytics("level_completed", { level: event.level, bonus: event.bonus, reward: event.reward });
+        // Ask for the like on a win. The wrapper owns the policy (3 wins, once ever).
+        void showContextualLikePrompt();
         analytics.funnelStep("ftue", 5, { level: event.level });
     } else if (event.type === "draft_open") {
         audioManager.play("reward");
